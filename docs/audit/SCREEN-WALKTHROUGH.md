@@ -2587,14 +2587,66 @@ or "open plan". No trainer-only rows.
 
 | # | Row | What it should do | What it actually does | Verdict |
 |---|---|---|---|---|
-| M0 | The sheet's **✕** / backdrop | close the menu | `closeAllSheets()` — closes **every** open sheet, not just this one | |
-| M1 | 🛒 **Grocery & Prep** | shopping list + prep sheet, Grocery / Meal Prep PDFs | closes the menu, opens the grocery overlay. **Only shown when a plan is live** | |
-| M2 | ✦ **Build my own plan with AI** | design a plan from scratch | `buildplan` sheet. Subtitle changes when a plan is live: "Switch to your own plan — your current one is saved to history" | |
-| M3 | 📈 **Trends** | averages + the progress charts | `trends` sheet | |
-| M4 | 🗂 **Plan versions** | current live + staged incoming; flips at midnight CT | `backSheet()` then `openVersions()` — the same timeline #6's banner opens | |
-| M5 | 📅 **Week ahead** | forward view, 1w / 4w / 8w / custom | `forward` sheet. **Only shown when a plan is live** | |
-| M6 | ⭐ **My Meals** | saved custom meals, reuse in any slot | `mymeals` sheet, inserting at the end of the day | |
-| M7 | ✦ **Coach: ON / OFF** | toggle insight cards, celebrations & nudges | flips `coachOn`, persisted, clears the dismissed state, toasts | |
+| M0 | The sheet's **✕** / backdrop | close the menu | `closeAllSheets()` — closes **every** open sheet | **WORKS** — *"tapping the menu and closing the menu works just fine"* |
+| M1 | 🛒 **Grocery & Prep** | shopping list + prep sheet, Grocery / Meal Prep PDFs | closes the menu, opens the grocery overlay. Only shown when a plan is live | **WORKS** — *"everything in the grocery and prep works exactly as it's supposed to, including creating printable PDFs of everything. That one is all locked in."* |
+| M2 | ✦ **Build my own plan with AI** | design a plan from scratch | `buildplan` sheet — five options, walked below | **UNTESTED BY HIM** — his own plan is written outside the app (the orange lock). Testing from the Test Client account. *"As far as I can tell it does seem to be working."* |
+| M3 | 📈 **Trends** | averages + the progress charts | `trends` sheet: a paragraph and a link to /progress | **RETIRE** — *"Let's remove that altogether. That is essentially the progress tab, so there's really no reason to have that there."* |
+| M4 | 🗂 **Plan versions** | current live + staged incoming | list of versions with LIVE / PENDING / ARCHIVED and "↩ Make this my plan again" | **WORKS, CHANGE REQUESTED** — *"It doesn't really tell you a whole lot just in that one tab. We should have a way to tap on that and open up a little more details on exactly what that plan looks like without actually clicking make this my plan again. That way if they want to reuse a previous plan they can look through the actual plans first instead of just a very brief small summary."* |
+| M5 | 📅 **Week ahead** | forward view 1w / 4w / 8w / custom | `forward` sheet | **WORKS** — *"good to go, able to see everything I need to see there."* |
+| M6 | ⭐ **My Meals** | saved custom meals | `mymeals` sheet | **WORKS** — *"When you create something with AI custom, it puts it in there as My Meals. I'm actually okay with that, I kinda like that. There is a way to delete them. That's perfect."* |
+| M7 | ✦ **Coach: ON / OFF** | toggle insight cards, celebrations & nudges | flips `coachOn`, persisted | **WORKS** |
+
+His close: *"I think that's everything for this page. Everything else, you can
+lock in."*
+
+#### M2's five options, and how each actually works
+
+Inventoried from `BuildPlanSheetView` and `/api/nutrition-ai/plan-build`. He
+asked *"tell me how all that stuff is set up to work"* — this is the answer,
+from the code, and two of the five are findings.
+
+| option | what he thinks it does | what it actually does |
+|---|---|---|
+| ✦ **Recommend my targets** | *"the AI will give them their actual targets"* | **The targets are the model's opinion, not a formula.** It is handed the latest weight and body-fat from `metrics`, `clients.primary_goal`, and the three consult answers, plus one prompt rule: *"protein ~0.8-1.2g per lb bodyweight, sensible deficit/surplus for the goal."* No TDEE, no activity arithmetic in code. Two clients with identical numbers can get different targets on different days. |
+| ✦ **Build from my targets** | *"them entering in their own targets"* | Exactly that — the four numbers are used as given. |
+| 🗣️ **Build it from the foods I eat** | *"does the AI only use the foods they eat, or does it recommend other foods?"* | **An instruction, not a constraint.** The prompt says *"build the plan out of the foods this client says they eat"* — and the shared library is still attached as a menu the model may reach into. So it can, and does, add foods they did not name. |
+| 🛠 **Save the day I built** | | Turns today's built slots into the ongoing plan. |
+| 🥗 **Build manually from the food database** | *"them actually building it"* | Exactly that. |
+
+#### FINDING — the AI's "library" is not the Recipes screen
+
+He asked *"where is it getting the actual foods from?"*
+
+The three AI builders are handed `MEAL_LIBRARY` and `RECIPE_LIBRARY` from
+`libraryForAi.ts` — **hardcoded TypeScript lists**, the 20 recipes written on
+15 Aug. They **never read the `recipes` table** that `/recipes` shows and that he
+and clients add to. So a recipe added on the Recipes screen is invisible to
+every AI builder and to the assistant.
+
+That contradicts the Batch 1 ruling from an hour earlier — *"all the AI in here
+has to have access to these recipes"* — and is now the top item for this
+screen's AI pass (step 0).
+
+#### FINDING — for anything it invents, the plan builder invents the macros too
+
+For a library meal the macros come from the database. For any item the model
+makes up, `plan-build`'s JSON schema has the model emit `kcal / p / c / f` per
+item, and nothing downstream re-prices them: `adopt-plan` writes them as they
+are, and the validator recomputes only the *totals* from those per-item
+figures. This is the class of number his 9 Sep ruling removed from chat
+(`a1edf49`), still live in the plan builder — and the literal answer to *"it
+rarely gets the numbers right."*
+
+#### DESIGN ASK, captured — "library recipes, or custom from my foods?"
+
+> *"Is there a way to determine if it's going to recommend actual meals and
+> recipes, or actual foods like chicken breast and rice, instead of using only
+> recipes from the actual recipe library? There needs to be a way to tell the
+> AI: use recipes from the library, or build my meals custom with the foods
+> that I'm giving you and give me portions for each one."*
+
+**Not built.** No such switch exists; the library is always offered as a menu
+and never as a rule. Belongs with the AI pass, alongside the two findings above.
 
 **Every one of M1–M6 opens something with its own controls.** Each is walked as
 its own sub-batch after the seven rows above: the grocery overlay, `buildplan`,
