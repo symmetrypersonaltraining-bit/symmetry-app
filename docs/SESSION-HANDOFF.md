@@ -69,7 +69,7 @@ Batch 1 commits (#40–#42).
 >   Drive converts to a native Doc. He said he will keep editing it in Drive, so
 >   the script is the seed, not the master.
 > - **Symmetry App Books (bookkeeping, P&L, loan, taxes)** (Google Sheet,
->   `1VmeA85OjZAgv54lfJGt_RdzyT2O7vNcqLhByr0vtqN4`) — eleven tabs: Settings,
+>   `1fpOomihXy42Q585tf_7zLejXxOXAp4qhBcqATRZEpes`) — eleven tabs: Settings,
 >   Categories, Ledger, ProfitLoss, BalanceSheet, Loan, Owners, SalesTax,
 >   Form1099, TaxSummary, Plan. He types on the Ledger only; everything else is
 >   formulas over it. Source: `docs/investor/build-books-xml.py` → uploaded as
@@ -83,9 +83,20 @@ Batch 1 commits (#40–#42).
 >   banners, cream boxed cells for what he types and grey italic columns for
 >   what the sheet works out, with a legend on Settings and the Ledger split by
 >   two banners into "YOU TYPE HERE" (A–I) and "THE SHEET FILLS THESE IN" (J–Q).
->   Two earlier uploads are **trashed**: the unstyled first cut, and a styled one
->   whose every ARRAYFORMULA read blank — see the self-closing `<Cell/>` trap in
->   section 6 before touching the builder's XML emitter.
+>   Earlier uploads are **trashed**: the unstyled first cut, a styled one whose
+>   every ARRAYFORMULA read blank (see the self-closing `<Cell/>` trap in
+>   section 6 before touching the builder's XML emitter), and the styled one
+>   before the manual was written.
+>
+>   **The Settings tab is a written manual, not a settings page.** Dustin,
+>   11 Sep: *"those instructions need to be a lot more specific … assume that I
+>   don't know anything about how to do any of this and give me the dummy
+>   version."* It now runs about 100 rows: start here, five one-off setup jobs
+>   (EIN, bank account, sales tax permit, W-9s, receipts folder), the nine
+>   settings, the colour legend, the Ledger column by column, fourteen worked
+>   transactions written as "type this in these boxes", the six-step monthly
+>   routine, a tax calendar that says what each filing is and where it is filed,
+>   and a troubleshooting list. Keep that voice if you touch it.
 >
 >   **The projection sheet it replaced is gone.** Dustin, 11 Sep:
 >   *"spreadsheet is crap … if im going to do all of the accounting, that
@@ -1679,7 +1690,11 @@ format that works is Excel's XML (`application/vnd.ms-excel`, the
 `<?mso-application progid="Excel.Sheet"?>` flavour) as **text**, 99 KB, no
 base64. `docs/investor/build-books-xml.py` writes it. There is no way to hand
 the tool a file: the whole workbook has to be typed into the `textContent`
-argument, so keep it under about 100 KB or the message hits the output limit.
+argument. 110 KB went through in one message; treat that as the ceiling. Two
+things buy room, both verified by probe: `ss:Type="String"` can be dropped from
+any `<Data>` whose text contains a letter (Google keeps it as text; without a
+letter it would be read as a number, so those keep the attribute), and the
+emitter rewrites style IDs to one character on the way out.
 Google's importer has four traps, each of which silently produced a wrong or
 rejected file:
 

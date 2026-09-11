@@ -112,7 +112,12 @@ class Sheet:
                 elif v == "":
                     o.append(f"<Cell{a}/>")
                 else:
-                    o.append(f'<Cell{a}><Data ss:Type="String">{escape(v)}</Data></Cell>')
+                    # ss:Type="String" is only needed where Google might guess a number,
+                    # a date or a formula; on a plain label the attribute is 22 wasted
+                    # bytes, and the file has to fit in one upload message.
+                    risky = v[:1] in "=+-@" or not re.search(r"[A-Za-z]", v)
+                    t = ' ss:Type="String"' if risky else ""
+                    o.append(f'<Cell{a}><Data{t}>{escape(v)}</Data></Cell>')
             o.append("</Row>")
         o.append("</Table>")
         if self.freeze:
@@ -151,57 +156,152 @@ EPOCH = "DATE(2000,1,1)"
 
 # ======================================================================= Start Here
 st = new("Settings", {1: 300, 2: 90, 3: 520})
+def two(r, label, body, lsty="stepl"):
+    """A manual row: short label in column A, the explanation across B and C."""
+    st.text(r, 1, label, lsty); st.text(r, 2, body, "wrap", merge=1)
+    return r + 1
 st.text(1, 1, "Symmetry App LLC \u2014 the books", "title", merge=2); st.heights[1] = 30
-st.text(2, 1, "One workbook for everything that comes in and goes out. You type on the Ledger tab only; every other tab is worked out from it. Built 11 Sep 2026 from the investor proposal. The tax notes are a guide for a two-member Texas LLC taxed as a partnership; have a CPA check the first return.", "sub", merge=2); st.heights[2] = 44
-st.banner(4, "SETTINGS \u2014 change these here and every tab follows", 3)
+st.text(2, 1, "Everything that comes in and goes out of the business, in one workbook. You type on the Ledger tab only; every other tab works itself out from it. Built 11 Sep 2026 from the investor proposal. The tax notes are a guide for a two-member Texas LLC taxed as a partnership \u2014 have a CPA check the first return.", "sub", merge=2); st.heights[2] = 44
+
+r = 4
+st.banner(r, "START HERE \u2014 READ THIS ONCE, IT TAKES FIVE MINUTES", 3); r += 1
+for t in [
+    "You do not need to know any accounting to use this. There is one rule: every time money moves in or out of the business, you add ONE line to the Ledger tab. That is the whole job. Profit and loss, the balance sheet, the loan, the sales tax, the tax return numbers \u2014 all of it is worked out from those lines. You never type on those tabs.",
+    "The tabs are the row of names along the bottom of the screen. Click Ledger. Row 1 is a gold banner, row 2 is the column headings, and row 3 already has an example line in it so you can see what a finished line looks like. When you are ready, type straight over row 3 with your first real transaction \u2014 it is only there as a sample, and until you replace it the reports will show a $300 filing fee that never happened.",
+    "The cream cells with a box round them are the only things you ever change on this tab. There are nine of them, just below. Everything else on this tab is instructions.",
+]:
+    st.text(r, 1, t, "wrap", merge=2); r += 1
+r += 1
+
+st.banner(r, "BEFORE THE FIRST LINE \u2014 five one-off jobs", 3); r += 1
+for label, body in [
+    ("An EIN", "A federal tax ID for the LLC, like a social security number for the business. You need one to file a partnership return and to send 1099s. Free from irs.gov \u2014 search \u201capply for an EIN online\u201d. It takes about fifteen minutes and you get the number on the screen at the end. Do not pay a service for this."),
+    ("A business bank account", "Open it in the LLC's name using the EIN. Then keep it clean: never pay a business cost from a personal account or a personal cost from the business account. If it happens anyway, do not hide it \u2014 record it as Member contribution: Dustin (money in) or Member distribution: Dustin (money out) and the books stay straight."),
+    ("A Texas sales tax permit", "Register at comptroller.texas.gov before your first sale to a Texas customer. It is free. You are not allowed to charge sales tax without it, and you are required to collect it once you have Texas customers."),
+    ("A W-9 from every contractor", "Before you pay a contractor their first dollar, get a signed Form W-9 back from them (free download from irs.gov). It gives you their legal name and tax ID, which you will need in January to send their 1099. Chasing it a year later is painful and some people simply stop answering."),
+    ("A receipts folder", "One folder in Drive per year. Every time you enter a line, drop the receipt in it and paste the link into the Receipt column."),
+]:
+    r = two(r, label, body)
+r += 1
+
+st.banner(r, "SETTINGS \u2014 change these here and every tab follows", 3); r += 1
 settings = [
-    ("TaxYear", "Year to report on (drives every report tab)", 2026, "int", "Change to 2027 in January and every report follows."),
-    ("LoanRate", "Loan interest rate per year", 0.07, "pct", "Proposal §3: 7% simple interest on drawn funds."),
-    ("Facility", "Committed facility from Lauren", 274000, "cur", "Proposal §3: drawn month by month, only when the account needs it."),
-    ("PctDustin", "Dustin's membership interest", 0.90, "pct", "Profit, loss and distributions split on these percentages (Schedule K-1)."),
-    ("PctLauren", "Lauren's membership interest", 0.10, "pct", "Proposal §3."),
-    ("SalesTaxRate", "Texas sales tax rate (state 6.25% + local, 8.25% max)", 0.0825, "pct", "Rate at the customer's Texas address. Out-of-state customers follow their own state's rules (most start at $100k of sales there)."),
-    ("TaxablePortion", "Share of a software subscription that Texas taxes", 0.80, "pct", "Texas treats SaaS as a data processing service: 80% of the charge is taxable, 20% exempt (Tax Code §151.351)."),
-    ("Threshold1099", "1099-NEC threshold", 2000, "cur", "Payments to one contractor in a year at or above this need a 1099-NEC by 31 January ($2,000 from 2026, indexed after 2027)."),
-    ("Reserve", "Cash reserve held before any distribution", 139000, "cur", "Proposal §3, §5: about four months of running costs."),
+    ("TaxYear", "Year to report on", 2026, "int", "The reporting year. Every report tab shows this year and nothing else. Change it to 2027 in January and the whole workbook moves with it; last year's numbers are not lost, they come back when you put the year back."),
+    ("LoanRate", "Loan interest rate per year", 0.07, "pct", "Proposal \u00a73: 7% simple interest, charged only on money actually drawn."),
+    ("Facility", "Committed facility from Lauren", 274000, "cur", "Proposal \u00a73: the most that can be drawn in total, taken month by month only when the account needs it."),
+    ("PctDustin", "Dustin's membership interest", 0.90, "pct", "Profit, loss and distributions are split on these two percentages. They are what each Schedule K-1 reports."),
+    ("PctLauren", "Lauren's membership interest", 0.10, "pct", "Proposal \u00a73. The two must add up to 100%."),
+    ("SalesTaxRate", "Texas sales tax rate", 0.0825, "pct", "6.25% state plus local, capped at 8.25% in total. Use the rate at the customer's Texas address. Customers in other states follow their own state's rules and usually owe nothing until you pass about $100,000 of sales there."),
+    ("TaxablePortion", "Share of a subscription Texas taxes", 0.80, "pct", "Texas treats software sold as a subscription as a data processing service: 80% of the charge is taxable and 20% is exempt (Tax Code \u00a7151.351)."),
+    ("Threshold1099", "1099-NEC threshold", 2000, "cur", "Pay one contractor this much or more in a year and you must send them a 1099-NEC by 31 January. $2,000 from 2026, rising with inflation after 2027."),
+    ("Reserve", "Cash reserve before any distribution", 139000, "cur", "Proposal \u00a73 and \u00a75: about four months of running costs stays in the account before anybody takes money out."),
 ]
-for i, (nm, label, val, sty, note) in enumerate(settings):
-    r = 5 + i
+for nm, label, val, sty, note in settings:
     st.text(r, 1, label, "lab"); st.put(r, 2, val, "in" + sty); st.text(r, 3, note, "note")
     names[nm] = f"{SET}{r}"
-r = 5 + len(settings) + 1
-st.banner(r, "WHAT THE COLOURS MEAN", 3); r += 1
-st.text(r, 1, "Cells like this one are yours to type in.", "in")
-st.text(r, 2, "", "in")
-st.text(r, 3, "Cream with a box round it: an entry field. Everything else on a report tab is worked out for you.", "note"); r += 1
-st.text(r, 1, "Grey italic columns fill themselves.", "auto")
-st.text(r, 2, "", "auto")
-st.text(r, 3, "On the Ledger, columns J to Q. Typing over them breaks the reports.", "note"); r += 2
-banner_rows = []
-for txt, sty in [
-    ("HOW TO DO THE BOOKS \u2014 about an hour a month", "bn"),
-    ("1. Every time money moves, add one line on the Ledger: date, who, what for, category from the dropdown, amount in OR out, and which account it moved through. Loan draws, loan payments, money you take out, sales tax: all of it goes in the same list. Columns J to Q fill themselves; do not type there. The dropdowns cover the first 1,000 lines; after that, copy a filled cell down or just type the category exactly.", "wrap"),
-    ("2. A loan payment is two lines: the interest part (category Loan interest) and the principal part (Loan principal repayment). The Loan tab shows how much interest has built up.", "wrap"),
-    ("3. Stripe: record customer charges as Trainer subscriptions or Individual subscriptions in the Stripe account, Stripe's fee as Payment processing fees, and the payout to the bank as Transfer between accounts (one line out of Stripe, one line into Bank).", "wrap"),
-    ("4. Month end: check that the Balance Sheet cash for each account equals the bank, Stripe and card statements. If it does not, a line is missing or wrong. Then read the Profit & Loss for the month.", "wrap"),
-    ("5. Keep the receipt: paste a Drive link or the email subject in the Receipt column. The IRS wants a receipt for anything over $75 and for every meal.", "wrap"),
-    ("6. Never delete a line to fix a mistake; add a reversing line so the history stays honest. If a category shows NOT A CATEGORY in column N, the spelling does not match the Categories tab.", "wrap"),
-    ("", None),
-    ("TAX CALENDAR \u2014 dates fall in the year after the one being reported", "bn"),
-    ("15 Jan: last quarterly estimated tax payment for the members. Dustin and Lauren pay income tax personally on their share; the LLC itself pays none.", "wrap"),
-    ("31 Jan: 1099-NEC to every contractor the Form1099 tab marks YES, and a copy to the IRS.", "wrap"),
-    ("20th of each month (or quarter, as the Comptroller assigns): Texas sales tax return and payment. Register at comptroller.texas.gov before the first Texas sale.", "wrap"),
-    ("15 Mar: Form 1065 partnership return with a Schedule K-1 for each member. Late penalty $255 per member per month. Extension to 15 Sep with Form 7004.", "wrap"),
-    ("15 Apr: members' personal returns (Form 1040 with Schedule E and Schedule SE) and the Q1 estimate. 15 Jun: Q2 estimate. 15 Sep: Q3 estimate.", "wrap"),
-    ("15 May: Texas franchise tax. Under $2.65M of revenue nothing is owed, but the Public Information Report must still be filed or the LLC loses good standing.", "wrap"),
-    ("", None),
-    ("WHAT THE TABS ARE", "bn"),
-    ("Ledger is the only tab you type on. Categories feeds its dropdown. ProfitLoss, BalanceSheet, Loan, Owners, SalesTax, Form1099 and TaxSummary all read the Ledger. Plan holds the proposal's budget and ProfitLoss compares actuals to it.", "wrap"),
-]:
-    if txt:
-        if sty == "bn": st.banner(r, txt, 3)
-        else: st.text(r, 1, txt, sty, merge=2)
     r += 1
+r += 1
+
+st.banner(r, "WHAT THE COLOURS MEAN", 3); r += 1
+st.text(r, 1, "Cream with a box round it.", "in"); st.text(r, 2, "", "in")
+st.text(r, 3, "A cell you type in.", "note"); r += 1
+st.text(r, 1, "Grey italic.", "auto"); st.text(r, 2, "", "auto")
+st.text(r, 3, "The sheet fills it in. On the Ledger that is columns J to Q. Typing over them breaks the reports.", "note"); r += 1
+st.text(r, 1, "Gold box.", "keyb"); st.text(r, 2, "", "keyb")
+st.text(r, 3, "A number worth looking at: the balance check, the profit for the year, what is available to distribute.", "note"); r += 2
+
+st.banner(r, "THE LEDGER, COLUMN BY COLUMN \u2014 what goes in each box", 3); r += 1
+for label, body in [
+    ("A \u2014 Date", "The day the money actually moved, not the date on the invoice. Type it like 9/11/2026."),
+    ("B \u2014 Payee / who", "Who you paid, or who paid you. Spell a contractor's name exactly the same way every single time \u2014 the 1099 tab adds up by this name, and \u201cJohn Smith\u201d and \u201cJohn Smith LLC\u201d are two different people to a spreadsheet."),
+    ("C \u2014 What for", "A plain sentence in your own words: \u201cSeptember hosting\u201d, \u201cLLC filing fee\u201d. This is what you will be reading in a year's time when you cannot remember."),
+    ("D \u2014 Category", "Pick it from the dropdown. Click the cell and a small arrow appears at its right-hand edge; click the arrow and choose from the list. The list comes from the Categories tab. This is the one column that has to be right \u2014 every report in the workbook is built on it. If you cannot see an arrow, read IF SOMETHING LOOKS WRONG at the bottom of this tab."),
+    ("E \u2014 Money in", "Money that came INTO the business. Fill in E or F, never both on the same line."),
+    ("F \u2014 Money out", "Money that LEFT the business. Type it as a plain positive number: 300, not -300. The sheet knows it is money going out because of the column it is in."),
+    ("G \u2014 Account", "Which pot it moved through: Bank, Stripe, Card or Cash. Also a dropdown. This is what lets the Balance Sheet be checked against each statement."),
+    ("H \u2014 Receipt link / ref", "The Drive link to the receipt, or the subject line of the email receipt. Takes five seconds now and saves an afternoon later."),
+    ("I \u2014 Notes", "Anything else worth remembering. Optional, except for meals."),
+    ("J to Q \u2014 leave alone", "Grey italic, and worked out for you: the month, the net amount, the category number, the type, the tax line it lands on and whether it counts toward a 1099. Do not type in them. If one of them looks wrong the answer is always in columns A to I."),
+]:
+    r = two(r, label, body)
+r += 1
+
+st.banner(r, "EVERY KIND OF TRANSACTION \u2014 exactly what to type", 3); r += 1
+for label, body in [
+    ("A customer pays you $115 through Stripe", "One line. Date = the day Stripe charged them. Payee = the customer. Category = Trainer subscriptions. Money in = 115. Account = Stripe. Enter the FULL amount they were charged, not the smaller amount that lands after fees."),
+    ("Stripe keeps its fee, say $3.45", "A second line. Payee = Stripe. Category = Payment processing fees. Money out = 3.45. Account = Stripe. The fee is a business expense in its own right, which is why it gets its own line."),
+    ("Stripe pays $111.55 over to the bank", "Two lines, same date and same amount. First: Category = Transfer between accounts, Money out = 111.55, Account = Stripe. Second: Category = Transfer between accounts, Money in = 111.55, Account = Bank. Transfers always come in pairs, they cancel each other out, and they are neither income nor expense \u2014 the money was already yours."),
+    ("You pay the developer $10,000", "One line. Payee = the developer's name, spelled the same as last month. Category = Developer (contractor). Money out = 10000. Account = Bank."),
+    ("You put your own money in", "Category = Member contribution: Dustin. Money in. This is not income and nobody is taxed on it."),
+    ("Lauren sends over a draw on the loan", "Category = Loan draw from Lauren. Money in. Not income either \u2014 it is borrowed. From that month the Loan tab starts charging 7% a year on it."),
+    ("You pay Lauren back", "TWO lines. The interest part: Category = Loan interest, Money out. The principal part: Category = Loan principal repayment, Money out. Column G on the Loan tab shows how much interest has built up so far, which tells you how to split the payment. Only the interest part is a business expense; paying back the principal is not."),
+    ("You take money out for yourself", "Category = Member distribution: Dustin. Money out. It is not an expense and you are not taxed on it again \u2014 you already pay tax on your share of the profit whether you take it out or not. Paying your personal tax bill out of the business account belongs here too."),
+    ("You charge a Texas customer sales tax", "Two lines: the subscription (Category = Trainer subscriptions, Money in = the charge) and the tax (Category = Sales tax collected, Money in = the tax). The tax has never been your money \u2014 you are holding it for Texas, and the SalesTax tab keeps count of what you owe."),
+    ("You pay Texas its sales tax", "Category = Sales tax remitted to Texas. Money out."),
+    ("A customer wants a refund", "Category = Refunds to customers, and put it in Money OUT. Do not type a negative number into Money in."),
+    ("You buy a $1,800 laptop", "Category = Office, equipment and supplies. Money out. Over $2,500 for one item, ask the CPA whether it has to be written off over several years instead of all at once."),
+    ("You take a client to lunch", "Category = Meals. Money out. Write who you met and what you discussed in the Notes column \u2014 that is what the IRS asks for. Only half of a business meal is deductible, and the Tax Summary tab takes care of that for you."),
+    ("You realise last month was wrong", "Never delete the line. Add a new line that reverses it \u2014 same amount, opposite column, a note saying what it fixes \u2014 and then enter the correct line. The history stays honest and the balance check keeps working."),
+]:
+    r = two(r, label, body, "lab")
+r += 1
+
+st.banner(r, "THE MONTHLY ROUTINE \u2014 about an hour, the same day each month", 3); r += 1
+for label, body in [
+    ("1. Enter everything", "Open last month's bank, Stripe and card statements. Work down them line by line and make sure every single transaction has a line on the Ledger. Nothing else in the workbook can be right if this is not."),
+    ("2. Check the cash agrees", "BalanceSheet tab. Cash in Bank, Cash in Stripe and Cash in Card each have to equal the closing balance on that statement. If one is out, a line is missing, entered twice, or sitting in the wrong account."),
+    ("3. Check the balance check", "Same tab, the gold box near the bottom. It must read $0.00. If it does not, almost always a Transfer between accounts is missing its second line, or a line has an amount in both Money in and Money out."),
+    ("4. Read the month", "ProfitLoss tab. The column for that month shows what came in, what went out, and the profit or loss. The three columns on the right compare the year so far against the proposal's plan."),
+    ("5. Sales tax", "If you had Texas sales, the SalesTax tab has the numbers. File and pay by the 20th \u2014 see the calendar below."),
+    ("6. Put the tax money aside", "TaxSummary tab, the bottom of the Schedule K-1 block: \u201cSet aside for quarterly estimates\u201d. Move that much into a separate savings account and do not touch it. No employer is withholding tax for you any more, and this is the step people regret skipping."),
+]:
+    r = two(r, label, body)
+r += 1
+
+st.banner(r, "TAX CALENDAR \u2014 what is due, when, and what to do about it", 3); r += 1
+st.text(r, 1, "A two-member LLC is treated by the IRS as a partnership. The LLC itself pays no income tax: it files a return that reports the profit, and then each of you pays tax personally on your share, whether or not you actually took the money out. Dates below fall in the year AFTER the year being reported \u2014 the 2026 books are filed in 2027. If a date lands on a weekend or a federal holiday it moves to the next working day.", "wrap", merge=2); r += 1
+for label, body in [
+    ("The 20th, every month", "TEXAS SALES TAX. File and pay online at comptroller.texas.gov (their system is called Webfile). The SalesTax tab gives you every number you need. The Comptroller may put you on quarterly filing instead \u2014 they will tell you which when you register. File even in a month when you collected nothing: a zero return is still required and a missed one starts at a $50 penalty."),
+    ("31 January", "1099-NEC FORMS. Open the Form1099 tab: anyone it marks \u201cYES, send one\u201d needs a 1099-NEC, sent to them and filed with the IRS by this date. You need their W-9 to fill it in. An attorney gets one even if they are a corporation; other corporations do not get one. File free through the IRS IRIS system online, or let a payroll service do it. Late filing runs $60 to $340 per form."),
+    ("15 January", "Q4 ESTIMATED TAX. Paid personally by each member at irs.gov/payments, not by the LLC. The amount is on the TaxSummary tab under \u201cSet aside for quarterly estimates\u201d."),
+    ("15 March", "FORM 1065 \u2014 the partnership return, with a Schedule K-1 for each of you. This is the big one. Hand the CPA the TaxSummary tab and they have almost everything they need. The late penalty is $255 per member per month, which is $510 a month for the two of you, so if you are not ready then file Form 7004 by this same date for an automatic extension to 15 September. The extension buys time for the FORM, not for the money \u2014 estimates are still due on their own dates."),
+    ("15 April", "YOUR PERSONAL RETURNS. Each of you files a Form 1040 that includes your K-1: Schedule E page 2 for the share of profit, and Schedule SE for self-employment tax on Dustin's share. Lauren is a passive investor so her share is usually not subject to self-employment tax \u2014 have the CPA confirm that for her. Q1 ESTIMATED TAX is due the same day."),
+    ("15 May", "TEXAS FRANCHISE TAX and the PUBLIC INFORMATION REPORT, at comptroller.texas.gov. Below $2.65M of revenue there is no tax to pay, but the Public Information Report still has to be filed every single year. Skip it and the LLC loses its good standing, and with it the liability protection that is the entire point of having an LLC. It takes about ten minutes."),
+    ("15 June", "Q2 ESTIMATED TAX."),
+    ("15 September", "Q3 ESTIMATED TAX. Also the final deadline for Form 1065 if you took the extension in March."),
+    ("All year round", "KEEP THE RECEIPTS. The IRS wants a receipt for anything over $75 and for every meal, with who you met and why. A line on a bank statement is not a receipt."),
+    ("Three things to tell the CPA", "One: the developer is writing software in the United States, so \u00a7174A lets you deduct what you pay them in the year you pay it rather than spreading it out. Two: money spent before the business opens is \u00a7195 startup cost \u2014 up to $50,000 is deductible in the year it opens (launch is March 2027) and the rest is spread over fifteen years, which is why those costs have their own category. Three: the money from Lauren is a genuine loan, so the interest is deductible here and is interest income to her, and she needs a 1099-INT from you if it comes to $600 or more in a year."),
+]:
+    r = two(r, label, body)
+r += 1
+
+st.banner(r, "IF SOMETHING LOOKS WRONG", 3); r += 1
+for label, body in [
+    ("No dropdown in the Category column", "Click the cell first \u2014 the little arrow only appears on the cell you have selected, and only from row 3 down. If there is still no arrow, you can build it yourself in about twenty seconds: click cell D3, then in the menu go Data \u25b8 Data validation \u25b8 Add rule, set Criteria to \u201cDropdown (from a range)\u201d, type Categories!A4:A61 in the box, tick \u201cShow warning\u201d, then Done. Drag the little blue square at the bottom-right of D3 down the column to copy it to the rows below. Or skip it entirely and type the category by hand \u2014 it just has to be spelled exactly as it is on the Categories tab. The built-in dropdowns only cover rows 3 to 1000; past that, copy a filled cell down."),
+    ("Column N says NOT A CATEGORY", "Whatever is in column D on that line is not spelled the same as anything on the Categories tab. Pick it from the dropdown again, or fix the spelling."),
+    ("The balance check is not $0.00", "Nearly always one of two things: a Transfer between accounts that only got one of its two lines, or a line with an amount typed into both Money in and Money out."),
+    ("A whole month shows nothing", "Check the Year in Settings at the top of this tab. The report tabs only ever show that one year."),
+    ("The balance sheet does not match the bank", "A line is missing, has been entered twice, or is sitting in the wrong Account."),
+    ("You need a category that is not there", "Add it on the Categories tab, on the first empty row between 4 and 61. Fill in all five columns \u2014 the Type column decides whether it counts as profit \u2014 and it turns up in the dropdown straight away."),
+    ("You are not sure how to record something", "Put it in with your best guess and write what really happened in the Notes column. A line with a note is easy to fix later; a transaction you never entered is invisible."),
+]:
+    r = two(r, label, body, "lab")
+r += 1
+
+st.banner(r, "WHAT THE TABS ARE", 3); r += 1
+for label, body in [
+    ("Ledger", "The only tab you type on."),
+    ("Categories", "The list behind the dropdown, and the tax line each category lands on."),
+    ("ProfitLoss", "What came in and went out, month by month, for the year in Settings, next to the proposal's plan."),
+    ("BalanceSheet", "What the business owns and owes at the end of that year, and the check that it all balances."),
+    ("Loan", "Lauren's facility month by month: drawn, repaid, interest built up, still available."),
+    ("Owners", "Each member's capital account, the numbers for their K-1, and what could be paid out today."),
+    ("SalesTax", "What Texas is owed each month and what has been paid."),
+    ("Form1099", "What each contractor has been paid this year against the $2,000 threshold."),
+    ("TaxSummary", "The numbers to hand whoever prepares Form 1065."),
+    ("Plan", "The proposal's monthly budget. ProfitLoss compares the real numbers to it. Edit it freely."),
+]:
+    r = two(r, label, body)
 
 # ======================================================================= Categories
 ca = new(CAT, {1: 200, 2: 70, 3: 210, 4: 45, 5: 520}, freeze=3)
@@ -557,6 +657,7 @@ STYLES = "<Styles>" + "".join([
     _st("note", F(Size=9, Italic=1, Color=GREY), align=AL(Vertical="Top", WrapText="1")),
     _st("wrap", F(Size=10), align=AL(Vertical="Top", WrapText="1")),
     _st("lab", F(Size=10), align=AL(Vertical="Center", WrapText="1")),
+    _st("stepl", F(Size=10, Bold=1, Color=NAVY), align=AL(Vertical="Top", WrapText="1")),
     # column headers
     _st("head", F(Size=10, Bold=1, Color="#FFFFFF"), FILL(NAVY), AL(Horizontal="Center", Vertical="Center", WrapText="1")),
     _st("headl", F(Size=10, Bold=1, Color="#FFFFFF"), FILL(NAVY), AL(Horizontal="Left", Vertical="Center", WrapText="1")),
@@ -591,5 +692,16 @@ keep = os.environ.get("SHEETS")
 doc += [s.xml() for s in sheets if not keep or s.name in keep.split(",")]
 doc.append("</Workbook>")
 data = "\n".join(doc)
+
+# The whole workbook has to be typed into one upload message, so style IDs are
+# rewritten to one or two characters on the way out. The names above stay
+# readable in this file; only the emitted XML is shortened.
+_ids = sorted(set(re.findall(r'ss:ID="([^"]+)"', data)) - {"Default"})
+_alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+_short = {}
+for i, _name in enumerate(_ids):
+    _short[_name] = _alphabet[i] if i < len(_alphabet) else _alphabet[i // 52 - 1] + _alphabet[i % 52]
+data = re.sub(r'(ss:(?:ID|StyleID)=")([^"]+)(")',
+              lambda m: m.group(1) + _short.get(m.group(2), m.group(2)) + m.group(3), data)
 open(OUT, "w", encoding="utf-8").write(data)
 print("written", OUT, len(data.encode()), "bytes;", [s.name for s in sheets])
