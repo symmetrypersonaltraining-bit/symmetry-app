@@ -44,6 +44,13 @@ export default function OnboardingWizard({ clientId, prefill }: Props) {
     injuries_limitations: prefill.injuries_limitations || "",
     current_weight: "",
     current_body_fat_pct: "",
+    // Height and sex. Dustin, 11 Sep 2026: "whenever somebody starts the app
+    // it should collect all of that information and put it in their profile."
+    // The consult cannot estimate daily expenditure without them, and it must
+    // never guess them.
+    height_ft: "",
+    height_in: "",
+    sex: "",
   });
 
   function set(field: string, val: string) {
@@ -264,6 +271,37 @@ export default function OnboardingWizard({ clientId, prefill }: Props) {
                   placeholder="e.g. 175"
                   className="w-full rounded-xl px-4 py-3 text-sm"
                   style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>
+                  Height
+                </label>
+                <div className="flex gap-3">
+                  <input type="number" value={form.height_ft} onChange={e => set("height_ft", e.target.value)}
+                    placeholder="ft" min="3" max="8" inputMode="numeric" aria-label="height feet"
+                    className="w-full rounded-xl px-4 py-3 text-sm"
+                    style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }} />
+                  <input type="number" value={form.height_in} onChange={e => set("height_in", e.target.value)}
+                    placeholder="in" min="0" max="11" inputMode="numeric" aria-label="height inches"
+                    className="w-full rounded-xl px-4 py-3 text-sm"
+                    style={{ background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }} />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>
+                  Sex
+                </label>
+                <div className="flex gap-3">
+                  {(["male", "female"] as const).map((v) => (
+                    <button key={v} type="button" onClick={() => set("sex", v)} aria-pressed={form.sex === v}
+                      className="flex-1 py-3 rounded-xl text-sm font-semibold capitalize"
+                      style={form.sex === v
+                        ? { background: "var(--brand-primary)", color: "white", border: "1px solid var(--brand-primary)" }
+                        : { background: "var(--brand-surface)", border: "1px solid var(--brand-border)", color: "var(--brand-text)" }}>
+                      {v}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-semibold mb-1.5" style={{ color: "var(--brand-text-secondary)" }}>

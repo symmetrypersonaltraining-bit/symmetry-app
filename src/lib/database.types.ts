@@ -4708,6 +4708,7 @@ export type Database = {
           expected_sessions_per_cycle: number | null
           experience_level: string | null
           flat_billing: boolean
+          height_in: number | null
           id: string
           injuries: string | null
           injuries_limitations: string | null
@@ -4727,6 +4728,7 @@ export type Database = {
           primary_goal: string | null
           secondary_goals: string | null
           session_rate: number | null
+          sex: string | null
           slug: string | null
           start_date: string | null
           trainer_id: string
@@ -4771,6 +4773,7 @@ export type Database = {
           expected_sessions_per_cycle?: number | null
           experience_level?: string | null
           flat_billing?: boolean
+          height_in?: number | null
           id?: string
           injuries?: string | null
           injuries_limitations?: string | null
@@ -4790,6 +4793,7 @@ export type Database = {
           primary_goal?: string | null
           secondary_goals?: string | null
           session_rate?: number | null
+          sex?: string | null
           slug?: string | null
           start_date?: string | null
           trainer_id: string
@@ -4834,6 +4838,7 @@ export type Database = {
           expected_sessions_per_cycle?: number | null
           experience_level?: string | null
           flat_billing?: boolean
+          height_in?: number | null
           id?: string
           injuries?: string | null
           injuries_limitations?: string | null
@@ -4853,6 +4858,7 @@ export type Database = {
           primary_goal?: string | null
           secondary_goals?: string | null
           session_rate?: number | null
+          sex?: string | null
           slug?: string | null
           start_date?: string | null
           trainer_id?: string

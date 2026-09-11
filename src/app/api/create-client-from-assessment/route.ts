@@ -158,6 +158,10 @@ export async function POST(req: NextRequest) {
     // Explicit: the trigger cannot see the creator through the admin client.
     ...(creatorTrainerId ? { trainer_id: creatorTrainerId } : {}),
     name, email, phone: nn(data.phone), date_of_birth: nn(data.date_of_birth),
+    // Feet + inches from the form, inches on the record. Sex only if it is one
+    // of the two the column accepts.
+    height_in: (() => { const ft = Number(data.height_ft), inch = Number(data.height_in); return Number.isFinite(ft) && ft > 0 ? Math.round(ft * 12 + (Number.isFinite(inch) ? inch : 0)) : null; })(),
+    sex: data.sex === "male" || data.sex === "female" ? data.sex : null,
     start_date: new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" }), // Central, not UTC: after 7pm Central the UTC date is already tomorrow
     experience_level: nn(data.experience_level), primary_goal: nn(data.primary_goal),
     days_per_week: daysPerWeek, training_frequency: daysPerWeek,
