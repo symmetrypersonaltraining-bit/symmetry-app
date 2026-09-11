@@ -282,8 +282,10 @@ test("valid swap_meal: items are names only — volunteered macros dropped, name
   assert.strictEqual(r.params.name, "Salmon + rice");
   // deepStrictEqual, not a kcal check: it proves p/c/f are ABSENT rather than
   // merely unread, and that a kcal the model stated outright is discarded too.
-  assert.deepStrictEqual(r.params.items[0], { name: "salmon", amount: 6, unit: "oz" });
-  assert.deepStrictEqual(r.params.items[1], { name: "jasmine rice", amount: 1, unit: "cup" });
+  // context (11 Sep) is where the food came from — words, never a number — and
+  // is null when the model gave none.
+  assert.deepStrictEqual(r.params.items[0], { name: "salmon", amount: 6, unit: "oz", context: null });
+  assert.deepStrictEqual(r.params.items[1], { name: "jasmine rice", amount: 1, unit: "cup", context: null });
   assert.ok(r.confirmation && r.reply);
 });
 test("valid move_meal by names only (positions null, refs kept for fuzzy resolution)", () => {
@@ -314,7 +316,7 @@ test("add_snack: items required + reduced to names only, name defaults to item j
   assert.strictEqual(r.params.name, "oreo");
   // No amount and no unit were stated, so both are null — and the three macros
   // the model volunteered are gone. This is the snack path into My Meals.
-  assert.deepStrictEqual(r.params.items[0], { name: "oreo", amount: null, unit: null });
+  assert.deepStrictEqual(r.params.items[0], { name: "oreo", amount: null, unit: null, context: null });
 });
 test("intent none passes through with clarify flag; confirmation forced null", () => {
   const r = nj.validateActReply({ intent: "none", params: { clarify: true }, confirmation: "ignored", reply: "Which meal do you mean?" });

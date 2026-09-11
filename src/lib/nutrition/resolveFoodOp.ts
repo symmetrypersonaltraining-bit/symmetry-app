@@ -48,9 +48,19 @@ export async function resolveFood(
   name: string,
   amount: number | null | undefined,
   unit: string | null | undefined,
+  /**
+   * Where it came from, when that changes what it is — see ParsedName.context.
+   * Never part of the search term: "beef fajitas from Rivera's" finds nothing,
+   * "beef fajitas" finds the rows. It reaches only the three judgement calls
+   * below, so a frozen bowl is refused for a restaurant queso and a plate is
+   * weighed as a plate.
+   */
+  context?: string | null,
 ): Promise<(ResolvedFood & { micros: unknown }) | null> {
   if (!name || !name.trim()) return null;
   const term = name.trim();
+  const ctx = context && context.trim() ? context.trim() : null;
+  const withContext = (said: string) => (ctx ? `${said}\nCONTEXT: ${ctx}` : said);
 
   // match_food_for_ai, NOT search_food_catalog. The latter matches the whole
   // phrase as one substring — "white potatoes, boiled" returns zero rows — and
@@ -80,7 +90,7 @@ export async function resolveFood(
       system: PICK_SYSTEM,
       maxTokens: 60,
       messages: [
-        { role: "user", content: `THEY ASKED FOR:\n${term}\n\nCANDIDATE ROWS:\n${describeCandidates(rows)}` },
+        { role: "user", content: `THEY ASKED FOR:\n${withContext(term)}\n\nCANDIDATE ROWS:\n${describeCandidates(rows)}` },
       ],
       validate: (raw) => {
         const n = validatePick(raw, rows.length);
@@ -219,7 +229,7 @@ export async function resolveFood(
       model: HAIKU_MODEL,
       system: ESTIMATE_SYSTEM,
       maxTokens: 120,
-      messages: [{ role: "user", content: term }],
+      messages: [{ role: "user", content: withContext(term) }],
       validate: (raw) => {
         const e = validateEstimate(raw);
         return e === null ? null : { e };
@@ -361,7 +371,7 @@ export async function resolveFood(
       maxTokens: 60,
       messages: [{
         role: "user",
-        content: `DATABASE ROW: ${row.name}\nTHEY SAID: ${term}\nTHEY COUNTED IN: ${askedUnit || "(no measure given)"}`,
+        content: `DATABASE ROW: ${row.name}\nTHEY SAID: ${withContext(term)}\nTHEY COUNTED IN: ${askedUnit || "(no measure given)"}`,
       }],
       validate: (raw) => {
         const v = validatePortion(raw);
@@ -398,14 +408,14 @@ export async function resolveFood(
  */
 export async function priceNamedFoods(
   deps: ResolveDeps,
-  named: { name: string; amount: number | null; unit: string | null }[],
+  named: { name: string; amount: number | null; unit: string | null; context?: string | null }[],
 ): Promise<{ items: PricedItem[]; unresolved: string[] }> {
   const items: PricedItem[] = [];
   const unresolved: string[] = [];
   for (const n of named) {
     let got: Awaited<ReturnType<typeof resolveFood>> = null;
     try {
-      got = await resolveFood(deps, n.name, n.amount, n.unit);
+      got = await resolveFood(deps, n.name, n.amount, n.unit, n.context ?? null);
     } catch {
       // A lookup that fell over is not licence to invent one.
       got = null;

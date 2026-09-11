@@ -97,6 +97,18 @@ export interface ParsedName {
   name: string;
   amount: number | null;
   unit: string | null;
+  /**
+   * Where the food came from, when that changes what it is: "restaurant dish,
+   * as served at Rivera's (Tex-Mex)". Null for a plain food.
+   *
+   * Dustin, 11 Sep: "Beef fajitas from Rivera's in Princeton Texas with flour
+   * tortillas and queso with ground beef" logged at 634 kcal. The name, the
+   * amount and the unit made it through; "from Rivera's" did not, so the
+   * fajitas became a packaged product at a label serving and the queso became
+   * a frozen bowl. Not used for the search — only for the judgement calls
+   * downstream: which row is the food, and what one plate of it weighs.
+   */
+  context: string | null;
 }
 
 export function validateParsedNames(raw: unknown): { items: ParsedName[] } | null {
@@ -115,7 +127,8 @@ export function validateParsedNames(raw: unknown): { items: ParsedName[] } | nul
         ? null
         : Number(amountRaw);
     const unit = typeof it.unit === "string" && it.unit.trim() ? it.unit.trim().slice(0, 16) : null;
-    out.push({ name, amount, unit });
+    const context = typeof it.context === "string" && it.context.trim() ? it.context.trim().slice(0, 120) : null;
+    out.push({ name, amount, unit, context });
   }
   return out.length ? { items: out } : null;
 }

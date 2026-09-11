@@ -3194,3 +3194,25 @@ carried the login and saved.
 
 Per-item permission given for all three ("all 3"). Test:
 `tests/unit/aFailedTickClearsWhenTheNextOneSaves.test.ts`.
+
+## Interlude — a restaurant plate is not a retail serving (11 Sep)
+
+Dustin, on his own lunch: *"Fix my lunch macros in the app. That's not even
+close."* He had typed "Beef fajitas from Rivera's in Princeton Texas with flour
+tortillas and queso with ground beef" into the coach chat and it logged
+**634 kcal**. Every number came off a row and the model never recited one, and
+it was still half the plate: the fajitas resolved to a packaged product
+("Fully Cooked Beef Fajitas", 1 serving = 78 g, 111 kcal) and the queso to a
+frozen "Beef & Chorizo Taco Bowl" (0.5 bowl, 227 kcal). The words "from
+Rivera's" were dropped at the first step, so nothing downstream knew it was a
+restaurant plate as served.
+
+| Control | Before | Now |
+|---|---|---|
+| Coach chat / "describe what you ate", restaurant or takeout meal | the restaurant was thrown away; each food was named like a grocery item and priced at a retail label serving | each item carries `context` ("restaurant dish, as served at Rivera's (Tex-Mex)"); the row pick refuses a frozen meal or packaged product for a restaurant dish, and the portion question answers for the plate (fajita meat ≈ 170–225 g, a queso bowl ≈ 170 g) |
+| His 11 Sep lunch row | 634 kcal · 37P / 74C / 21F | corrected by hand to **1,092 kcal · 69P / 69C / 60F** (fajita plate 513, two tortillas 296, queso with beef 283); backed up to `bak_dustin_lunch_20260911_{log,mymeal}`; the saved My Meal carries the same numbers |
+
+The search term is still the plain food name — "beef fajitas from Rivera's"
+finds nothing; "beef fajitas" finds the rows. Context reaches only the three
+judgement calls (pick, portion, estimate). Test:
+`tests/unit/aRestaurantPlateIsNotARetailServing.test.ts`.
