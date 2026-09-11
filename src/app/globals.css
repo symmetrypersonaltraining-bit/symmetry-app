@@ -2798,7 +2798,18 @@ option:hover {
     var(--brand-primary) 100%);
   --tile-cap-h: 3px;
 
-  background: color-mix(in srgb, #070A10 var(--sink), var(--brand-bg));
+  /* THE PAGE CAN ALSO CARRY THE SCHEME, NOT ONLY LESS LIGHT.
+     Sinking toward near-black darkens every scheme by the same amount and
+     desaturates all of them on the way — Citrus goes from a pale green to a
+     grey. --page-tint mixes the scheme's OWN primary back in afterwards, so a
+     deeper page still reads as that scheme's page rather than as grey.
+
+     0% by default, which is exactly the behaviour above it, so this commit
+     changes no pixel anywhere. It exists so the mock-up sheet and the app
+     move the same three numbers. */
+  --page-tint: 0%;
+  background: color-mix(in srgb, var(--brand-primary) var(--page-tint),
+    color-mix(in srgb, #070A10 var(--sink), var(--brand-bg)));
   min-height: 100vh;
 }
 
