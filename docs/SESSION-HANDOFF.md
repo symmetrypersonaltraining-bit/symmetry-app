@@ -34,8 +34,15 @@ and do not create another one.
 > The biggest number left in the food work is keyword coverage: **68,383 rows
 > still say "1 serving"** (counted 9 Sep). Section 5, "Known gaps".
 
-Last updated: **10 Sep 2026, midday Central** · `main` = `e32870c` plus the
-docs commit recording today's data changes.
+Last updated: **11 Sep 2026, evening Central** · `main` = `951896e` plus the
+docs commit recording the investor proposal (`docs/investor/`).
+
+> 💼 **11 Sep was the investor proposal, not app code.** He presents to Lauren
+> Standefer on 12 Sep. The $274,000 proposal is in his Drive, the research and
+> the build script are in `docs/investor/`, and section 5 ("the investor
+> proposal for Lauren") has every decision he has already made. **The contract
+> was never found and he said "hold on contract."** Open on it: his yes/no on
+> a draw-as-needed facility, and the quotes listed in the docx's section 8.
 **The gate is fully green**: 0 errors in `src/`, **3,074 unit tests pass 0 fail**,
 `test-nutrition-ai.cjs` **43 passed 0 failed**, build compiles. Shipped since the
 9 Sep merges: the access rule and its switch, the two red nutrition-AI tests
@@ -1018,6 +1025,70 @@ billing cycle. ill resume hers when she's back."*
   `uq_one_open_reminder_per_client` counts only pending/sent — so if the
   generator makes a fresh one first, delete the paused one).
 
+### ✅ DONE 11 Sep — the investor proposal for Lauren Standefer ($274,000)
+
+Not app code. He presents to Lauren on **12 Sep** and asked for the business
+plan and contract "from Notion". **The plan was in Google Drive, not Notion**
+(July version, Drive file `1Sf6F2RzAF5aeLKF1YDolRy1aG8pi3XgQ`: $4,000
+revenue-share, 30% until 1.5x). **The contract was never found** in Notion,
+Drive or Gmail; he said *"hold on contract"* — do not draft one until he says.
+
+What exists now, all of it built from a day of research (competitor pricing,
+adoption benchmarks, real 2026 cost quotes, marketing-agency rates) that lives
+in **`docs/investor/`** — read those four `research-*.md` files before touching
+a number:
+
+- **The proposal he presents:** `Symmetry-Investment-Proposal-2026-09-12.docx`
+  in his Drive folder "Symmetry Investor Package"
+  (folder `1hHNKot-R-HwhnL-kapj3oL1t91JqC64K`, file
+  `1ebssiLYPAnzVMpVJ3tHgNGNQx7YuQbwk`). Built by
+  `docs/investor/build-proposal.js` (docx-js; `npm install docx@9` in a
+  scratch dir, then `node build-proposal.js`). Rebuild from the script, never
+  edit the .docx by hand.
+- **The working page:** `docs/investor/symmetry-launch-plan-v2.html`, published
+  as an artifact at
+  https://claude.ai/code/artifact/f5f7da52-e986-461e-bad6-cef96161f9d2 (v6).
+- `docs/investor/app-inventory-summary.md` — what the app actually is today
+  (27 clients, 1,330 workouts, 13,975 sets, 2,367 meals, $19,472 invoiced).
+
+**His decisions, all final — do not re-ask:** ask is **$274,000**, drawn in two
+tranches (≈$60k Jan 2027, balance at the March 2027 web launch), Texas LLC;
+**7% interest**, five-year amortisation, **payments start at monthly break-even**
+(revenue ≥ $31,800 running costs, loan payment excluded); Lauren gets **10%
+ownership with 10% of profit distributions**, written in as a member who may
+sell back to him later; **no profit draws** by either of them until four months
+of expenses (~$139k) sit in the business account; his personal-training income
+is separate and never feeds the app. **One developer** (~$10,000/mo full time
+Jan→March, then ~$7,000 at three days a week; "I may have someone"), plus him
+as product owner drawing nothing. Marketing "heavy launch": fractional
+marketing lead from January, $20k/mo through August, **review at month 5 after
+launch (August 2027)**. Pricing: individuals **$49/mo**; trainers **$79/mo for
+5 clients + $15 per 5, capped at $199**, modelled at $115 average. Option B if
+Lauren won't fund the developer: an operating cash-flow loan for that line.
+
+**Projections (cohort model, in the page and the docx):** base ≈ $17k MRR at
+month 6, $30k at month 12, break-even month 13–14, cash-positive including the
+loan payment month 17–18; optimistic break-even month 7, cash-positive month 8;
+conservative never reaches expenses — the August review's kill signal is cost
+per paying trainer over $1,200. Peak cash actually needed: ≈ $236k base,
+≈ $145k optimistic (so a **draw-as-needed committed facility** instead of two
+fixed tranches would cut what she actually lends — put to him 11 Sep, awaiting
+his yes/no).
+
+**Section 8 of the docx lists the figures he must confirm with quotes** over the
+next few weeks (developer rate, marketing lead + media buyer, lawyer fixed fee,
+insurance, hosting list prices, average trainer price, Apple link-out fee). When
+he brings a quote: change the number in `build-proposal.js` and the HTML, rerun,
+re-upload to the same Drive folder with the new date in the name.
+
+**Also delivered 11 Sep in chat:** the copy/paste text for his client Sariah
+(her husband is COO of a software company; he is looking for one senior
+full-stack TypeScript/Next.js/Supabase/Stripe developer, January start, side
+gig or full time). Cost-cut questions answered: $312k → $274k came from the
+developer going part-time after launch, the marketing lead starting in January
+not November, 12% contingency, and tranche draws; dropping marketing spend
+was modelled ($15k/mo) and came out worse, so it stayed.
+
 ### THE NEXT SESSION'S JOB — the Nutrition button-by-button walk
 
 He asked for this specifically: *"then lets do the walk through button by button
@@ -1138,6 +1209,14 @@ Small and medium are the same 112 kcal. `food_portion_reference` fixed the
 2. **An end-to-end browser test of the home screen** against the live app. The
    current guard proves the refresh mechanism is mounted, not that the screen is
    right on a real phone. Offered; not started.
+3. **The investor plan's loan shape.** Two fixed tranches ($274k) versus a
+   draw-as-needed committed facility (peak ≈ $236k base, ≈ $145k optimistic).
+   Put to him 11 Sep with the break-even answer; his call, then rerun
+   `docs/investor/build-proposal.js` and re-upload.
+4. **The contract / term sheet for Lauren.** Never found; "hold on contract."
+   Draft only when he says, from the terms in section 5.
+5. **Stacie's $480 reminder** is a fresh unsent row for him to send from
+   Payments (section 5).
 
 ### Known gaps, nobody blocked
 
