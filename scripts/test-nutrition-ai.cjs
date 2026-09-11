@@ -93,13 +93,16 @@ console.log("\nmeter-core: daily limits");
 // meter-core). The CAPS are unchanged — these assert the same ceilings under
 // the new names, so a regression in the rename shows up here too.
 // Raised 15 -> 60 on the conversational surfaces, 15 Aug, at Dustin's
-// instruction after 15 cut Jennifer off mid-workout. food_photo, plan_build and
-// verify_food are deliberately unchanged — see tests/unit/aiFeatures.test.ts.
-test("defaults are 60/60/20/1 (+20 verify)", () => {
+// instruction after 15 cut Jennifer off mid-workout. food_photo and verify_food
+// are deliberately unchanged — see tests/unit/aiFeatures.test.ts. plan_build
+// went 1 -> 3 on 11 Sep ("three times per day permanently"), with a dated
+// 10/day window through 14 Sep for his testing — so the plan_build line asks
+// for a date AFTER the window, or it reads the temporary 10.
+test("defaults are 60/60/20/3 (+20 verify)", () => {
   assert.strictEqual(core.resolveDailyLimit(null, "coach_action"), 60);
   assert.strictEqual(core.resolveDailyLimit(undefined, "food_parse"), 60);
   assert.strictEqual(core.resolveDailyLimit({}, "food_photo"), 20);
-  assert.strictEqual(core.resolveDailyLimit({}, "plan_build"), 1);
+  assert.strictEqual(core.resolveDailyLimit({}, "plan_build", "2026-10-01"), 3);
   assert.strictEqual(core.resolveDailyLimit({}, "verify_food"), 20);
 });
 test("client_app_settings columns override defaults", () => {

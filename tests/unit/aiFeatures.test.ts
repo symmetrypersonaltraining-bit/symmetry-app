@@ -201,14 +201,14 @@ test("the caps are the ones Dustin set, and nothing drifted with them", () => {
   assert.equal(DEFAULT_LIMITS.coach_action, 60);
   assert.equal(DEFAULT_LIMITS.food_parse, 60);
   assert.equal(DEFAULT_LIMITS.food_photo, 20);
-  assert.equal(DEFAULT_LIMITS.plan_build, 1);
+  assert.equal(DEFAULT_LIMITS.plan_build, 3); // was 1 — his ruling, 11 Sep 2026
   assert.equal(DEFAULT_LIMITS.verify_food, 20);
   assert.equal(DEFAULT_LIMITS.workout_build, 8);
   assert.equal(DEFAULT_LIMITS.feedback_image, 30);
 
   // Deliberately NOT raised, each for its own reason:
   //   food_photo    20 — a photo is the most expensive client call there is
-  //   plan_build     1 — rebuilding a meal plan is not a thing to do twice a day
+  //   plan_build     3 — was 1; Dustin, 11 Sep 2026: "three times per day permanently"
   //   workout_build  8 — writes real rows; a loop here does damage, not spend
   //   feedback_image 30 — a side effect of reporting a bug, not a choice
   assert.equal(DEFAULT_LIMITS.food_photo, 20);
