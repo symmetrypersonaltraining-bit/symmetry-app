@@ -2497,11 +2497,74 @@ The ones that carry real risk and should be walked first: **`offplan`** (photo /
 typed / voice — the path whose macros are still the model's), **`foodsearch`**,
 **`composer`**, **`adjust`**, **`aiplan`**.
 
-### The three questions to put to him before the walk
+### The three questions — ANSWERED 11 Sep 2026, his words
 
-1. What is this screen **for**, in his words?
-2. What on it does he **never** use?
-3. What does he expect to be **wrong** before we start?
+**1. What is this screen for?**
+
+> *"This screen's entire function is to make it as easy as possible for anyone
+> using the app to record their daily food intake to compare against their
+> activity and dial in their deficit/surplus/maintenance to match goals."*
+>
+> *"What I want the client to walk away with is a very clear picture of where
+> they are at on the path to their goals, and what they need to adjust to stay
+> on track."*
+>
+> *"The main reason people don't log food is because it takes too much time and
+> it's a pain to get the correct numbers. That's where we can really leverage
+> the AI on this page — but it has to be coded correctly and the AI needs to
+> know what its job is and be able to make it easier on us to log food even if
+> it's not on an actual meal plan."*
+
+And the standard the AI on it has to meet — this is the bar for step 0:
+
+> *"The AI on this screen needs to know every bit of that information for each
+> client and keep it up to date as goals change and metrics change constantly.
+> The only thing worse than not tracking it at all is tracking it and then the
+> app telling you what to adjust based on bad numbers — and that's what I'm
+> seeing a lot of, so we need to get this one right."*
+
+**2. What on it does he never use?**
+
+> *"I look at everything on this page that's viewable from the main page. When
+> we get to clicking on all the buttons in the menus, that answer may change.
+> But right now I use everything on here, and I actually track my food. There's
+> nothing on here that I want to remove."*
+
+So: **no RETIRE candidates on the main page.** Revisit per sheet in Batch 6.
+
+**3. What does he expect to be wrong?**
+
+> *"Tons of screwed up details. Basically, the numbers being wrong. All three
+> AI functions not working properly some times of the week. The AI bot has
+> inaccurate information. Sometimes Dustin's assistant has inaccurate
+> information."*
+>
+> *"The functionality of the actual AI assistant in there has gotten better —
+> it's able to do things in the nutrition tab. However, it doesn't always do
+> them properly, and it rarely gets the numbers right."*
+
+The ruling that comes out of that, and it is the spec for the floating AI:
+
+> *"If I tell it what I eat from a specific restaurant, that AI bot needs to go
+> on the Internet and look up the actual numbers for exactly what I told it I
+> eat. The AI bot — the floating button in the nutrition page — should be able
+> to do anything that you can do in this app, and I want it to do it the same
+> way. If I came to Claude and said, hey, I replaced this meal with this, you
+> would go on the Internet, get the actual numbers, and log it for me properly.
+> That's what that AI bot needs to do. Currently it kind of does that, but not
+> the way I want, and the numbers are extremely inaccurate — just like the
+> lunch I did on mine today was way off and I had to come to my Claude project
+> to fix it. Clients won't have that option."*
+
+**"All three AI functions"** = the YOUR WEEK tile (#18), the COACH'S ASSISTANT
+tile (#20), and the floating AI bot (the coach chat sheet). Each gets its own
+pass against `AI-CONTRACT.md` in this screen's step 0.
+
+**Scope ruling for this walk:** *"Save the trainer view questions for after
+this audit as we will need to do this full audit again from my trainer end.
+Right now let's focus on finishing the full audit from client view."* So rows
+marked **T** are recorded but not walked now; the Nutrition screen gets a second,
+trainer-side walk later.
 
 ### Already answered, do not ask again
 
