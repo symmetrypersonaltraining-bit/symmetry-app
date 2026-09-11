@@ -46,8 +46,9 @@ investor handoff, merged as PR #31 — it had been left on a branch).
 > Standefer on 12 Sep. The $274,000 proposal is in his Drive, the research and
 > the build script are in `docs/investor/`, and section 5 ("the investor
 > proposal for Lauren") has every decision he has already made. **The contract
-> was never found and he said "hold on contract."** Open on it: his yes/no on
-> a draw-as-needed facility, and the quotes listed in the docx's section 8.
+> was never found and he said "hold on contract."** The loan is a draw-as-needed
+> facility (decided 11 Sep, late; proposal rebuilt and finalised in Drive).
+> Open on it: the quotes listed in the docx's section 8.
 **The gate is fully green**: 0 errors in `src/`, **3,074 unit tests pass 0 fail**,
 `test-nutrition-ai.cjs` **43 passed 0 failed**, build compiles. Shipped since the
 9 Sep merges: the access rule and its switch, the two red nutrition-AI tests
@@ -1046,7 +1047,10 @@ a number:
 - **The proposal he presents:** `Symmetry-Investment-Proposal-2026-09-12.docx`
   in his Drive folder "Symmetry Investor Package"
   (folder `1hHNKot-R-HwhnL-kapj3oL1t91JqC64K`, file
-  `1ebssiLYPAnzVMpVJ3tHgNGNQx7YuQbwk`). Built by
+  `1g2Bmi5UfED8oTyJHAdqwBwMfR-bNp7Iu`). **It is the only file in that folder**:
+  he said "finalize that proposal in drive n delete any others" (11 Sep, late),
+  so the first 12 Sep upload and the July $4,000 revenue-share proposal are
+  both in his Drive Trash, recoverable for 30 days. Built by
   `docs/investor/build-proposal.js` (docx-js). Rebuild from the script, never
   edit the .docx by hand. Exact command, proven 11 Sep night:
   `npm install docx@9` in a scratch dir, then
@@ -1059,8 +1063,10 @@ a number:
 - `docs/investor/app-inventory-summary.md` — what the app actually is today
   (27 clients, 1,330 workouts, 13,975 sets, 2,367 meals, $19,472 invoiced).
 
-**His decisions, all final — do not re-ask:** ask is **$274,000**, drawn in two
-tranches (≈$60k Jan 2027, balance at the March 2027 web launch), Texas LLC;
+**His decisions, all final — do not re-ask:** ask is a **$274,000 committed
+loan facility, drawn month by month against the shortfall** (his call, 11 Sep
+late: "yes do the draw-as-needed facility"; base path draws ≈ $238k, peak
+≈ $242k with the first loan payments; optimistic ≈ $146k), Texas LLC;
 **7% interest**, five-year amortisation, **payments start at monthly break-even**
 (revenue ≥ $31,800 running costs, loan payment excluded); Lauren gets **10%
 ownership with 10% of profit distributions**, written in as a member who may
@@ -1078,10 +1084,9 @@ Lauren won't fund the developer: an operating cash-flow loan for that line.
 month 6, $30k at month 12, break-even month 13–14, cash-positive including the
 loan payment month 17–18; optimistic break-even month 7, cash-positive month 8;
 conservative never reaches expenses — the August review's kill signal is cost
-per paying trainer over $1,200. Peak cash actually needed: ≈ $236k base,
-≈ $145k optimistic (so a **draw-as-needed committed facility** instead of two
-fixed tranches would cut what she actually lends — put to him 11 Sep, awaiting
-his yes/no).
+per paying trainer over $1,200. Under the facility Lauren's interest is
+≈ $62,000 base (payment ≈ $4,710/mo) or ≈ $32,500 optimistic (≈ $2,890/mo)
+instead of $66,700–$79,900 on a fully drawn $274k. Page is v7.
 
 **Section 8 of the docx lists the figures he must confirm with quotes** over the
 next few weeks (developer rate, marketing lead + media buyer, lawyer fixed fee,
@@ -1217,13 +1222,9 @@ Small and medium are the same 112 kcal. `food_portion_reference` fixed the
 2. **An end-to-end browser test of the home screen** against the live app. The
    current guard proves the refresh mechanism is mounted, not that the screen is
    right on a real phone. Offered; not started.
-3. **The investor plan's loan shape.** Two fixed tranches ($274k) versus a
-   draw-as-needed committed facility (peak ≈ $236k base, ≈ $145k optimistic).
-   Put to him 11 Sep with the break-even answer; his call, then rerun
-   `docs/investor/build-proposal.js` and re-upload.
-4. **The contract / term sheet for Lauren.** Never found; "hold on contract."
+3. **The contract / term sheet for Lauren.** Never found; "hold on contract."
    Draft only when he says, from the terms in section 5.
-5. **Stacie's $480 reminder** is a fresh unsent row for him to send from
+4. **Stacie's $480 reminder** is a fresh unsent row for him to send from
    Payments (section 5).
 
 ### Known gaps, nobody blocked
