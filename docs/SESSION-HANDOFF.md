@@ -57,15 +57,39 @@ Batch 1 commits (#40–#42).
 >   (docx-js) → `docs/investor/docx-to-html.py` → uploaded as `text/html`, which
 >   Drive converts to a native Doc. He said he will keep editing it in Drive, so
 >   the script is the seed, not the master.
-> - **Symmetry-App-Accounting-2026-09-12** (Google Sheet,
->   `1HFFxNnqPMBHaCY6A6u8oHoNT8NOvc5cZvVJwxccQ_1E`) — one sheet, six sections
->   (INPUTS, SUMMARY, PROJECTION, LOAN, P&L, ACTUALS), Google-native array
->   formulas. Source: `docs/investor/build-accounting-csv.py` → uploaded as
->   `text/csv`. Verified in Drive: base case breaks even Apr 2028 (month 14),
->   balance $241,460, payment $4,781/mo, peak balance $240,060, interest
->   $58,841 — within a few thousand of the proposal's rounded figures.
-> - He also has an Excel version of the same model as a file card in the chat
->   (multi-tab, per-cell formulas); the Drive sheet is the one to keep up.
+> - **Symmetry App Books (bookkeeping, P&L, loan, taxes)** (Google Sheet,
+>   `1Qj2oKFQEOpUtAyApHfSDPh-tbITVsxV8XEfH_mDmkDc`) — eleven tabs: Settings,
+>   Categories, Ledger, ProfitLoss, BalanceSheet, Loan, Owners, SalesTax,
+>   Form1099, TaxSummary, Plan. He types on the Ledger only; everything else is
+>   formulas over it. Source: `docs/investor/build-books-xml.py` → uploaded as
+>   `application/vnd.ms-excel` (SpreadsheetML 2003, the only *text* format that
+>   converts to a multi-tab Google Sheet). Verified in Drive with the seeded
+>   $300 example line: it lands in ProfitLoss Sep 2026, BalanceSheet cash
+>   −$300, Owners −$270/−$30 on the 90/10 split, TaxSummary line 20 and §195
+>   both $300, and the balance check reads exactly $0.00.
+>
+>   **The projection sheet it replaced is gone.** Dustin, 11 Sep:
+>   *"spreadsheet is crap … if im going to do all of the accounting, that
+>   spreadsheet needs to be able to have everything that comes in and out of the
+>   business and track it against the loan, revenue, etc … also this will be
+>   used for taxes."* The old `Symmetry-App-Accounting-2026-09-12`
+>   (`1HFFxNnqPMBHaCY6A6u8oHoNT8NOvc5cZvVJwxccQ_1E`) was a projection model, not
+>   books; it is **trashed**, and `docs/investor/build-accounting-csv.py` is
+>   deleted with it. The proposal's monthly budget survives as the Plan tab, and
+>   ProfitLoss compares actuals to it.
+>
+>   **The tax rules baked in** (researched 11 Sep; a CPA still signs the first
+>   return): Texas taxes SaaS as a data processing service — **80% of the charge
+>   taxable** at 6.25% state + local, 8.25% max, filed by the 20th. Franchise tax
+>   **no-tax-due under $2.65M** but the Public Information Report is still due
+>   **15 May**. Two-member LLC = partnership: **Form 1065 + K-1s by 15 Mar**,
+>   penalty **$255 per member per month**, extension to 15 Sep. **1099-NEC
+>   threshold is $2,000** from 2026 (OBBBA), due 31 Jan. **§174A**: domestic
+>   software development expensed in full in the year paid, tax years after 2024.
+>   **§195**: up to **$50,000** of pre-launch startup cost deductible in the year
+>   the business opens (launch, March 2027), the rest over 15 years. Estimates
+>   15 Apr / 15 Jun / 15 Sep / 15 Jan. Meals 50%. Attorneys get a 1099 even
+>   incorporated.
 >
 > **The contract is still on hold** ("Don't worry about the contract yet").
 > Quotes for the proposal's section 8 are still the open item on the investor
@@ -1527,6 +1551,31 @@ a CSV or an xlsx import, so a whole model can be one formula per column.
 
 In Google Sheets, `LET(aa, …)` or `LET(t, …)`, `x`, `z`, `ac` … evaluates to
 `#ERROR!` with no message; prefix the names (`qBal`, `qAA`). Cost an hour.
+
+### A multi-tab Google Sheet uploads as SpreadsheetML 2003 — 11 Sep
+
+`text/csv` only ever makes **one** tab. For the eleven-tab books workbook the
+format that works is Excel's XML (`application/vnd.ms-excel`, the
+`<?mso-application progid="Excel.Sheet"?>` flavour) as **text**, 94 KB, no
+base64. `docs/investor/build-books-xml.py` writes it. Google's importer has four
+traps, each of which silently produced a wrong or rejected file:
+
+- **Formulas must be R1C1.** A1 references are not converted. The script
+  converts from A1 automatically; quoted strings are left alone.
+- **Every formula cell needs `<Data ss:Type="Number">0</Data>`.** Without the
+  cached value the cell *and the cells after it in that row* vanish.
+- **`ss:Index` is ignored** on `Row`, `Cell` and `Column`. Gaps must be written
+  as explicit empty `<Row/>` and `<Cell/>` elements or everything shifts left.
+- **A `DataValidation` range past row 1000 fails the whole conversion** with
+  "Unable to convert uploaded content" and no hint which sheet. The dropdowns
+  stop at row 1000.
+
+Also: **sheet names must be one word.** A quoted cross-tab reference such as
+`'Start Here'!R5C2` is dropped silently and the formula reads 0, which is why
+the tabs are `Settings`, `ProfitLoss`, `BalanceSheet`, `SalesTax`, `Form1099`,
+`TaxSummary`. And `&` only concatenates with a string literal on its left, so
+the month keys are numeric (category number × 100000 + month serial), not joined
+text. Column number formats reach only the rows the file contains.
 
 ### LibreOffice is dead in the Claude Code sandbox — 11 Sep
 
