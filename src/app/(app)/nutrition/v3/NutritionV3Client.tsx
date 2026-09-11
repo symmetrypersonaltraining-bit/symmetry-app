@@ -29,6 +29,8 @@ import { pickPlanForDate } from "@/lib/nutrition/resolvePlan";
 import { groupedNutrients, pctOfDaily, splitNutrientsForStorage } from "@/lib/nutrition/nutrients";
 import Sheet from "./Sheet";
 import { planTargetDrift } from "@/lib/ai/nutrition-json";
+import TargetEditor from "@/components/nutrition/TargetEditor";
+import { fromGrams, type MacroTargets } from "@/lib/nutrition/macroSplit";
 import FoodSearchSheet from "./FoodSearchSheet";
 import ComposerSheet from "./ComposerSheet";
 import CoachChatSheet, { CoachActionItem, CoachActions } from "./CoachChatSheet";
@@ -4031,7 +4033,10 @@ function AiPlanSheet({
   onClose: () => void;
   onBack: () => void;
 }) {
-  const [tgIn, setTgIn] = useState({ kcal: "2200", p: "180", c: "230", f: "55" });
+  // One shape for the targets he types and the targets he overrides on the
+  // draft — both go through TargetEditor / macroSplit, so calories and macros
+  // can never drift apart. See macroSplit.ts for why grams are the truth.
+  const [tgIn, setTgIn] = useState<MacroTargets>(fromGrams(180, 230, 55));
 
   // Brooke Orton, 23 Aug: "Would be cool if when you're putting in macros it
   // auto calculated calories."
@@ -4040,15 +4045,6 @@ function AiPlanSheet({
   // hand is both a chore and a way to send the model a target whose calories
   // and macros disagree — which it then cannot hit, because nothing can.
   // Editing kcal directly still works: that is the one field this leaves alone.
-  function setTarget(field: "kcal" | "p" | "c" | "f", raw: string) {
-    const v = raw.replace(/[^0-9]/g, "");
-    setTgIn((prev) => {
-      const next = { ...prev, [field]: v };
-      if (field === "kcal") return next;
-      const kcal = kcalOf(Number(next.p) || 0, Number(next.c) || 0, Number(next.f) || 0);
-      return { ...next, kcal: kcal > 0 ? String(Math.round(kcal)) : "" };
-    });
-  }
   const [answers, setAnswers] = useState<Record<string, string>>({});
   // FOODS MODE. Dustin, 22 Aug: "you need an option for them to type/say what
   // foods they want ai to use to build a plan that fits their macros n
@@ -4112,21 +4108,6 @@ function AiPlanSheet({
     setDraft((d) => d && ({ ...d, meals: d.meals.map((m, i) => (i === mi ? { ...m, [field]: value } : m)) }));
   }
 
-  /**
-   * The TARGETS are his to override outright. Typing a macro refills calories
-   * the same 4/4/9 way the entry form does; editing calories directly is left
-   * alone, which is the one field that must stay hand-settable.
-   */
-  function patchTarget(field: "kcal" | "p" | "c" | "f", raw: string) {
-    const v = Number(raw.replace(/[^0-9]/g, "")) || 0;
-    setEdited(true);
-    setDraft((d) => {
-      if (!d) return d;
-      const t = { ...d.targets, [field]: v };
-      if (field !== "kcal") t.kcal = Math.round(kcalOf(t.p, t.c, t.f));
-      return recomputeDraft({ ...d, targets: t });
-    });
-  }
   const label = mode === "targets" ? "AI draft" : mode === "foods" ? "my foods" : "coach consult";
   const inputStyle: React.CSSProperties = { background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)", borderRadius: 12, padding: "10px 12px", fontSize: 13, width: "100%", outline: "none", textAlign: "center" };
 
@@ -4163,12 +4144,9 @@ function AiPlanSheet({
           <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--brand-text-secondary)" }}>Daily targets — kcal · P · C · F (g)</p>
           <p className="text-xs mb-2" style={{ color: "var(--brand-text-secondary)" }}>Type the macros and the calories fill themselves in.</p>
           <div className="grid grid-cols-4 gap-2 mb-3">
-            {(["kcal", "p", "c", "f"] as const).map((k) => (
-              <input key={k} value={tgIn[k]} inputMode="numeric" onChange={(e) => setTarget(k, e.target.value)} placeholder={k.toUpperCase()} style={inputStyle}
-                aria-label={k === "kcal" ? "Calories — fills in from the macros" : k === "p" ? "Protein (g)" : k === "c" ? "Carbs (g)" : "Fat (g)"} />
-            ))}
+        <TargetEditor value={tgIn} onChange={setTgIn} />
           </div>
-          <button onClick={() => run({ targets: { kcal: +tgIn.kcal, p: +tgIn.p, c: +tgIn.c, f: +tgIn.f } })}
+          <button onClick={() => run({ targets: tgIn })}
             className="w-full py-3 rounded-2xl text-sm font-bold text-white" style={{ background: "var(--brand-primary)" }}>
             ✦ Draft 5 meals to these targets →
           </button>
@@ -4223,15 +4201,12 @@ function AiPlanSheet({
           </p>
           <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--brand-text-secondary)" }}>Daily targets — leave blank to use your current ones</p>
           <div className="grid grid-cols-4 gap-2 mb-3">
-            {(["kcal", "p", "c", "f"] as const).map((k) => (
-              <input key={k} value={tgIn[k]} inputMode="numeric" onChange={(e) => setTarget(k, e.target.value)} placeholder={k.toUpperCase()} style={inputStyle}
-                aria-label={k === "kcal" ? "Calories — fills in from the macros" : k === "p" ? "Protein (g)" : k === "c" ? "Carbs (g)" : "Fat (g)"} />
-            ))}
+        <TargetEditor value={tgIn} onChange={setTgIn} />
           </div>
           <button
             onClick={() => run({
               foods: { text: foodsText.trim() },
-              targets: (+tgIn.kcal > 0 && +tgIn.p > 0) ? { kcal: +tgIn.kcal, p: +tgIn.p, c: +tgIn.c, f: +tgIn.f } : undefined,
+              targets: (tgIn.kcal > 0 && tgIn.p > 0) ? tgIn : undefined,
             })}
             disabled={foodsText.trim().length < 3}
             className="w-full py-3 rounded-2xl text-sm font-bold text-white"
@@ -4281,15 +4256,9 @@ function AiPlanSheet({
           </div>
           {/* THE TARGETS ARE HIS TO OVERRIDE. Typing a macro refills calories
               4/4/9; calories stay hand-settable. */}
-          <p className="text-xs font-bold uppercase tracking-widest mb-1 mt-1" style={{ color: "var(--brand-text-secondary)" }}>Targets — yours to change</p>
-          <div className="grid grid-cols-4 gap-1.5 mb-2">
-            {([["kcal", "KCAL"], ["p", "P"], ["c", "C"], ["f", "F"]] as const).map(([k, lab]) => (
-              <label key={k} className="block">
-                <span className="block text-center" style={{ fontSize: 9, fontWeight: 800, letterSpacing: 0.6, color: "var(--brand-text-secondary)" }}>{lab}</span>
-                <input inputMode="numeric" aria-label={`target ${lab}`} value={String(draft.targets[k])}
-                  onChange={(e) => patchTarget(k, e.target.value)} style={inputStyle} />
-              </label>
-            ))}
+          <div className="mb-2">
+            <TargetEditor title="Targets — yours to change" value={draft.targets}
+              onChange={(t) => { setEdited(true); setDraft((d) => d && recomputeDraft({ ...d, targets: t })); }} />
           </div>
 
           {draft.meals.map((dm, i) => {

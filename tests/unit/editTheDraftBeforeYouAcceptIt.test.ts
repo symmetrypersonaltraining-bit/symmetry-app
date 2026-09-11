@@ -29,11 +29,15 @@ test("one editor serves all three modes, because they share this sheet", () => {
   assert.equal(CODE.split("Draft total").length - 1, 1, "one draft block, not one per mode");
 });
 
-test("the targets are editable, and a macro refills calories 4/4/9", () => {
-  assert.match(SHEET, /aria-label=\{`target \$\{lab\}`\}/, "all four targets are inputs");
-  assert.match(SHEET, /function patchTarget/);
-  assert.match(SHEET, /if \(field !== "kcal"\) t\.kcal = Math\.round\(kcalOf\(t\.p, t\.c, t\.f\)\);/,
-    "typing a macro recomputes calories; calories stay hand-settable");
+test("the targets are editable, through the one shared control", () => {
+  // Was four bare inputs with a 4/4/9 refill. Dustin, 11 Sep: "we need to be
+  // able to change the macros and the calories, and they all need to follow
+  // each other… set the macros by percentages and give a number in grams at
+  // each percentage." That is TargetEditor, shared with the entry form, and
+  // the arithmetic is macroSplit.ts — see macrosAndCaloriesFollowEachOther.
+  assert.match(SHEET, /<TargetEditor title="Targets — yours to change"/);
+  assert.match(SHEET, /onChange=\{\(t\) => \{ setEdited\(true\); setDraft\(\(d\) => d && recomputeDraft\(\{ \.\.\.d, targets: t \}\)\); \}\}/,
+    "an override recomputes the target check against the meals below it");
 });
 
 test("every part of a meal can be changed or removed", () => {
