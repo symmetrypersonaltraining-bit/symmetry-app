@@ -45,6 +45,10 @@ export default function TargetEditor({
   title?: string;
 }) {
   const [raw, setRaw] = useState<Record<string, string>>({});
+  // The target as it stood when the focused field was entered. Rescaling the
+  // calories from the LAST keystroke zeroes every macro on the way to a bigger
+  // number — see setKcal. This is the baseline it scales from instead.
+  const [base, setBase] = useState<MacroTargets | null>(null);
   const pct = pctOf(value);
 
   const box: React.CSSProperties = {
@@ -55,12 +59,17 @@ export default function TargetEditor({
 
   const digits = (s: string) => s.replace(/[^0-9]/g, "");
   const shown = (key: string, real: number) => (raw[key] !== undefined ? raw[key] : String(real));
-  const commit = (key: string, text: string, apply: (n: number) => MacroTargets) => {
+  const commit = (key: string, text: string, apply: (n: number, from: MacroTargets) => MacroTargets) => {
     const d = digits(text);
+    const from = base ?? value;
+    if (!base) setBase(from);
     setRaw((r) => ({ ...r, [key]: d }));
-    onChange(apply(d === "" ? 0 : Number(d)));
+    onChange(apply(d === "" ? 0 : Number(d), from));
   };
-  const release = (key: string) => setRaw((r) => { const n = { ...r }; delete n[key]; return n; });
+  const release = (key: string) => {
+    setRaw((r) => { const n = { ...r }; delete n[key]; return n; });
+    setBase(null);
+  };
 
   const MACROS: { k: MacroKey; label: string }[] = [
     { k: "p", label: "PROTEIN" }, { k: "c", label: "CARBS" }, { k: "f", label: "FAT" },
@@ -76,7 +85,7 @@ export default function TargetEditor({
           <span style={cap}>CALORIES</span>
           <input inputMode="numeric" aria-label="target calories"
             value={shown("kcal", value.kcal)}
-            onChange={(e) => commit("kcal", e.target.value, (n) => setKcal(value, n))}
+            onChange={(e) => commit("kcal", e.target.value, (n, from) => setKcal(value, n, from))}
             onBlur={() => release("kcal")}
             style={{ ...box, fontWeight: 800 }} />
         </label>
@@ -85,7 +94,7 @@ export default function TargetEditor({
             <span style={cap}>{label} g</span>
             <input inputMode="numeric" aria-label={`target ${label.toLowerCase()} grams`}
               value={shown(k, value[k])}
-              onChange={(e) => commit(k, e.target.value, (n) => setGrams(value, k, n))}
+              onChange={(e) => commit(k, e.target.value, (n, from) => setGrams(from, k, n))}
               onBlur={() => release(k)}
               style={box} />
           </label>
@@ -100,7 +109,7 @@ export default function TargetEditor({
           <label key={k} className="block">
             <input inputMode="numeric" aria-label={`target ${label.toLowerCase()} percent`}
               value={shown(`${k}%`, pct[k])}
-              onChange={(e) => commit(`${k}%`, e.target.value, (n) => setPct(value, k, n))}
+              onChange={(e) => commit(`${k}%`, e.target.value, (n, from) => setPct(from, k, n))}
               onBlur={() => release(`${k}%`)}
               style={{ ...box, padding: "8px 6px", fontSize: 12 }} />
             <span style={{ ...cap, marginTop: 2 }}>

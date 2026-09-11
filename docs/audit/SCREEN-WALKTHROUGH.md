@@ -3696,3 +3696,40 @@ the actual build my own plan with AI menu — the exact same AI, everything work
 exactly the same."* They already did. **Five doors, one sheet** — two on the
 "turn this into my plan" card, three in the build menu, all `kind: "aiplan"` at
 the same mode. A test pins the count so nobody builds a sixth, lighter path.
+
+### Round two — and the bug the first round shipped  ·  11 Sep 2026
+
+**The bug he found within minutes:** *"If I change the calories, it immediately
+zeros out all of the protein, carbs, and fat."*
+
+Typing `2000` into a 2,135 kcal target sends **four** values through `setKcal` —
+2, 20, 200, 2000. The first scales every macro by 2/2135, which rounds all three
+to zero; from then on there is no split left to keep and every later keystroke
+just writes a calorie number onto three zeros.
+
+The fix is the rule the item amounts already used and the targets did not:
+**scale from the value as it stood when the field was focused, never from the
+last keystroke.** Same oversight, same shape, now the same rule in both places.
+
+**Added in the same pass, from his list:**
+
+- **Add a food to any meal** — the same `FoodSearchSheet` the rest of the app
+  logs with, so an added item carries `food_catalog`'s numbers and never a
+  typed or model-invented one. It stacks OVER the draft rather than replacing
+  it, because the draft lives in local state and navigating away would throw
+  away every edit. An added item becomes its own scaling baseline, so its
+  amount behaves exactly like one the AI wrote.
+- **Revert to what the coach came up with** — the draft as it arrived is kept
+  from the moment it loads, and the button only appears once something has
+  changed. *"If I play around with the numbers and I don't like it, we can
+  default back to what the AI originally put."*
+- **Every edit recomputes everything.** *"If I edit anything, the logic auto
+  adjusts everything."* Renaming a meal now goes through `recomputeDraft` too —
+  a no-op for macros, but it makes the invariant unconditional, and a test
+  asserts that NO draft write skips the recompute, so a path added next month
+  is covered without anyone remembering.
+
+**Still not built from his round-two list:** swapping an item for another *in
+place* (add + remove does it today), rebuilding one meal with AI to a per-meal
+target, reordering meals, and an explicit before/after delta against the
+draft's own targets.

@@ -111,3 +111,55 @@ test("the target check after an edit is the SERVER's, not a looser one", () => {
   const off = planTargetDrift({ targets: { kcal: 2200, p: 180, c: 230, f: 55 }, totals: { kcal: 2357, p: 242, c: 239, f: 49 } } as never);
   assert.equal(off.ok, false, "his real draft — +157 kcal, +62g protein — is not");
 });
+
+test("a food can be ADDED to a meal, from the food database", () => {
+  // Dustin, 11 Sep: *"I should be able to add different items from the library
+  // or from AI parse, to actually rebuild that meal completely custom if I
+  // choose to. The AI comes up with the general meal plan. We still have the
+  // option to fine tune it and edit it."*
+  assert.match(SHEET, /Add a food to \{dm\.name/, "every meal has an add row");
+  assert.match(SHEET, /function addItem\(mi: number/);
+  assert.match(SHEET, /<FoodSearchSheet/, "the same picker the rest of the app logs food with");
+  assert.match(SHEET, /onPick=\{\(it\) => addItem\(addingTo, it\)\}/);
+});
+
+test("the picker STACKS over the draft rather than replacing it", () => {
+  // AiPlanSheet holds the draft in local state, so navigating away from it
+  // would throw away every edit made so far.
+  const idx = SHEET.indexOf("<FoodSearchSheet");
+  const close = SHEET.indexOf("</Sheet>");
+  assert.ok(close > -1 && idx > close, "the picker renders after the draft's own Sheet closes, as a sibling");
+  assert.match(SHEET, /\{addingTo !== null && \(/);
+});
+
+test("an added food carries the catalogue's numbers and becomes its own baseline", () => {
+  assert.match(SHEET, /p: picked\.p \|\| 0, c: picked\.c \|\| 0, f: picked\.f \|\| 0/, "from the picker, not typed");
+  assert.match(SHEET, /setBaseItems\(\(b\) => \(\{ \.\.\.b, \[_k\]: item \}\)\)/,
+    "so its amount scales exactly like an item the AI wrote");
+});
+
+test("there is a way back to the AI's own draft", () => {
+  // Dustin: *"There needs to be a button to revert back to what the AI came up
+  // with. If I play around with the numbers and I don't like it, we can
+  // default back to what the AI originally put."*
+  assert.match(SHEET, /function revertToAi\(\)/);
+  assert.match(SHEET, /setAiOriginal\(fresh\)/, "the original is kept the moment the draft loads");
+  assert.match(SHEET, /Revert to what the coach came up with/);
+  assert.match(SHEET, /\{edited && aiOriginal && \(/, "and it only shows once something has been changed");
+});
+
+test("EVERY edit recomputes the totals and the target check — no exceptions", () => {
+  // Dustin, 11 Sep: *"Make sure the logic, if I edit anything, the logic auto
+  // adjusts everything. So if I put a different item in the meal, that needs
+  // to auto adjust the macros and the calories everywhere."*
+  //
+  // Rather than asserting the paths that exist today, this asserts that NO
+  // path writes the draft without recomputing. A new edit added next month is
+  // covered by it automatically, which is the only version of this guard worth
+  // having.
+  const writes = SHEET.match(/setDraft\(\(d\) => d &&[^\n]*/g) || [];
+  assert.ok(writes.length >= 5, `found ${writes.length} draft writes — the matcher has probably stopped matching`);
+  for (const w of writes) {
+    assert.match(w, /recomputeDraft\(/, `a draft write that does not recompute:\n  ${w.trim()}`);
+  }
+});

@@ -4071,6 +4071,16 @@ function AiPlanSheet({
    * alone moves the answer 166 kcal and nothing on screen would say so. These
    * are asked for once, saved to the profile, and never asked again.
    */
+  /**
+   * The draft exactly as the AI produced it, kept so every edit is undoable.
+   *
+   * Dustin, 11 Sep: *"There needs to be a button to revert back to what the AI
+   * came up with. If I play around with the numbers and I don't like it, we can
+   * default back to what the AI originally put."*
+   */
+  const [aiOriginal, setAiOriginal] = useState<PlanDraft | null>(null);
+  /** Which meal an added food is going into, or null. */
+  const [addingTo, setAddingTo] = useState<number | null>(null);
   const [needs, setNeeds] = useState<MissingInput[] | null>(null);
   const [gap, setGap] = useState({ sex: "", dob: "", ft: "", inch: "", weight: "" });
   const [savingGap, setSavingGap] = useState(false);
@@ -4094,7 +4104,9 @@ function AiPlanSheet({
     };
     setBaseItems(base);
     setEdited(false);
-    setDraft(recomputeDraft(keyed));
+    const fresh = recomputeDraft(keyed);
+    setAiOriginal(fresh);
+    setDraft(fresh);
   }
 
   /** Replace one item in place, then recompute everything above it. */
@@ -4119,9 +4131,57 @@ function AiPlanSheet({
     setDraft((d) => d && recomputeDraft({ ...d, meals: d.meals.filter((_, i) => i !== mi) }));
   }
 
+  /**
+   * A food picked from the database goes in as an item, with the catalogue's
+   * numbers.
+   *
+   * Dustin, 11 Sep: *"I should be able to add different items from the library
+   * or from AI parse, to actually rebuild that meal completely custom if I
+   * choose to. In other words, the AI comes up with the general meal plan. We
+   * still have the option to fine tune it and edit it."*
+   *
+   * The macros come from `food_catalog` through the same picker the rest of the
+   * app uses — never typed, never from a model. An added item becomes its own
+   * scaling baseline, so its amount behaves exactly like one the AI wrote.
+   */
+  function addItem(mi: number, picked: { n: string; a?: string | null; p: number; c: number; f: number; k?: number }) {
+    const _k = `add:${mi}:${Date.now()}`;
+    // The picker hands back an amount LABEL ("6 oz cooked"); split the leading
+    // number off it so the amount box is a number the scaler can work with.
+    const label = (picked.a || "").trim();
+    const m = /^([\d.]+)\s*(.*)$/.exec(label);
+    const item: DraftItem = {
+      food: picked.n,
+      amount: m ? Number(m[1]) : null,
+      unit: m ? (m[2] || null) : (label || null),
+      p: picked.p || 0, c: picked.c || 0, f: picked.f || 0,
+      kcal: picked.k ?? kcalOf(picked.p || 0, picked.c || 0, picked.f || 0),
+      _k,
+    };
+    setBaseItems((b) => ({ ...b, [_k]: item }));
+    setEdited(true);
+    setAddingTo(null);
+    setDraft((d) => d && recomputeDraft({
+      ...d,
+      meals: d.meals.map((mm, i) => (i === mi ? { ...mm, items: [...mm.items, item] } : mm)),
+    }));
+  }
+
+  /** Back to the AI's draft, exactly as it arrived. */
+  function revertToAi() {
+    if (!aiOriginal) return;
+    setDraft(aiOriginal);
+    setEdited(false);
+  }
+
   function patchMeal(mi: number, field: "name" | "timing", value: string) {
     setEdited(true);
-    setDraft((d) => d && ({ ...d, meals: d.meals.map((m, i) => (i === mi ? { ...m, [field]: value } : m)) }));
+    // Through recomputeDraft even though a name changes no macros. Dustin,
+    // 11 Sep: *"if I edit anything, the logic auto adjusts everything."* Making
+    // that unconditional costs one no-op call and means no future edit path can
+    // be the one that forgot — which is how the totals and the meals drift
+    // apart in the first place. A test holds it.
+    setDraft((d) => d && recomputeDraft({ ...d, meals: d.meals.map((m, i) => (i === mi ? { ...m, [field]: value } : m)) }));
   }
 
   const label = mode === "targets" ? "AI draft" : mode === "foods" ? "my foods" : "coach consult";
@@ -4189,6 +4249,7 @@ function AiPlanSheet({
   }
 
   return (
+    <>
     <Sheet
       title={mode === "targets" ? "✦ Build me a plan" : mode === "foods" ? "✦ Build it from my foods" : "✦ Coach consult"}
       subtitle={draft ? "Draft — review, then make it your ongoing plan"
@@ -4409,6 +4470,11 @@ function AiPlanSheet({
                       style={{ width: 28, height: 28, flexShrink: 0, color: "var(--brand-text-secondary)", background: "transparent", border: 0, fontSize: 13 }}>✕</button>
                   </div>
                 ))}
+                <button type="button" onClick={() => setAddingTo(i)}
+                  className="w-full mt-1.5 py-2 rounded-xl text-xs font-bold"
+                  style={{ border: "1px dashed var(--brand-border)", color: "var(--brand-primary)", background: "transparent" }}>
+                  ＋ Add a food to {dm.name || `meal ${i + 1}`}
+                </button>
               </div>
             );
           })}
@@ -4419,6 +4485,13 @@ function AiPlanSheet({
           <p className="text-xs mb-2" style={{ color: "var(--brand-text-secondary)" }}>
             Change anything above — the totals and the target check follow as you type. Accepting saves exactly what you see, and every meal stays editable afterwards too.
           </p>
+          {edited && aiOriginal && (
+            <button type="button" onClick={revertToAi}
+              className="w-full py-2.5 rounded-2xl text-xs font-bold mb-1.5"
+              style={{ border: "1px solid var(--brand-border)", color: "var(--brand-text-secondary)", background: "transparent" }}>
+              ↩ Revert to what the coach came up with
+            </button>
+          )}
           <button onClick={() => onAccept(draft, label)} disabled={saving}
             className="w-full py-3 rounded-2xl text-sm font-bold text-white" style={{ background: "var(--brand-primary)" }}>
             {saving ? "Creating your plan…" : `Accept — make it my ongoing plan ✓ (${clientName.split(" ")[0]})`}
@@ -4426,6 +4499,21 @@ function AiPlanSheet({
         </>
       )}
     </Sheet>
+    {/* Stacked OVER the draft rather than replacing it — AiPlanSheet holds the
+        draft in local state, so navigating away from it would throw away every
+        edit. The picker is the same one the rest of the app logs food with, so
+        an added item carries food_catalog's numbers, not a model's. */}
+    {addingTo !== null && (
+      <FoodSearchSheet
+        clientId={clientId}
+        title="Add a food"
+        subtitle={`Into ${draft?.meals[addingTo]?.name || `meal ${addingTo + 1}`} — from the food database`}
+        onPick={(it) => addItem(addingTo, it)}
+        onClose={() => setAddingTo(null)}
+        onBack={() => setAddingTo(null)}
+      />
+    )}
+    </>
   );
 }
 

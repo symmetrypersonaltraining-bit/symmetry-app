@@ -81,3 +81,25 @@ test("nothing can be driven negative", () => {
   assert.equal(setKcal(T, -100).kcal, 0);
   assert.ok(setPct(T, "c", 140).c > 0);
 });
+
+test("typing a calorie number keystroke by keystroke does NOT zero the macros", () => {
+  // Dustin, 11 Sep: *"If I change the calories, it immediately zeros out all
+  // of the protein, carbs, and fat."* Typing 2000 into a 2,135 kcal target
+  // sends 2, 20, 200, 2000 through setKcal. Scaling from the LAST value makes
+  // the first keystroke round every macro to zero, and from then on there is
+  // no split left to keep.
+  const base = fromGrams(180, 230, 55);
+  let t = base;
+  for (const k of [2, 20, 200, 2000]) t = setKcal(t, k, base);
+  assert.ok(Math.abs(t.kcal - 2000) <= 6, `landed on ${t.kcal}`);
+  assert.ok(t.p > 150 && t.c > 190 && t.f > 45, `macros survived: ${JSON.stringify(t)}`);
+  // And the split is the one he started with.
+  const a = pctOf(base), b = pctOf(t);
+  for (const k of ["p", "c", "f"] as const) assert.ok(Math.abs(a[k] - b[k]) <= 1, `${k}: ${a[k]}% → ${b[k]}%`);
+});
+
+test("without a baseline it still behaves — `from` defaults to the current target", () => {
+  // One call, no typing: the old signature's behaviour is unchanged.
+  const once = setKcal(fromGrams(180, 230, 55), 1800);
+  assert.ok(Math.abs(once.kcal - 1800) <= 4);
+});
