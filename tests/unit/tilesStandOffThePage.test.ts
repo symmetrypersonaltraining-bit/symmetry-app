@@ -84,7 +84,7 @@ function palettes(): Record<string, Record<string, string>> {
 }
 
 /** The three numbers a .sym-page block sets, read rather than hardcoded. */
-function pageVars(block: RegExp): { sink: number; deep: number; lift: number } {
+function pageVars(block: RegExp): { sink: number; deep: number; lift: number; tint: number } {
   const m = BARE.match(block);
   assert.ok(m, `could not find the .sym-page block for ${block}`);
   const n = (name: string) => {
@@ -92,7 +92,10 @@ function pageVars(block: RegExp): { sink: number; deep: number; lift: number } {
     assert.ok(g, `--${name} is not set in ${block}`);
     return Number(g![1]);
   };
-  return { sink: n("sink"), deep: n("tile-deep"), lift: n("tile-lift") };
+  // --page-tint is only declared on the light block; the dark one inherits
+  // its 0%, so a missing value there is correct rather than a failure.
+  const tint = m![1].match(/--page-tint:\s*([\d.]+)%/);
+  return { sink: n("sink"), deep: n("tile-deep"), lift: n("tile-lift"), tint: tint ? Number(tint[1]) : 0 };
 }
 
 const PAL = palettes();
@@ -101,7 +104,7 @@ const DARK = pageVars(/\[data-appearance="dark"\] \.sym-page,([\s\S]*?)\n\}/);
 
 /**
  * The page and the tile as the browser resolves them:
- *   page = color-mix(#070A10 sink%, --brand-bg)
+ *   page = color-mix(--brand-primary tint%, color-mix(#070A10 sink%, --brand-bg))
  *   tile = color-mix(#FFFFFF lift%, color-mix(--brand-primary deep%, --brand-surface))
  *
  * `flipped` applies the appearance override for the scheme's opposite, which
@@ -125,7 +128,7 @@ function ratioFor(theme: string, flipped: boolean): number {
     v = LIGHT; // the :not([data-appearance="light"]) on every by-name rule
   }
 
-  const page = mix(hex("#070A10"), v.sink, bg);
+  const page = mix(p, v.tint, mix(hex("#070A10"), v.sink, bg));
   const tile = mix(hex("#FFFFFF"), v.lift, mix(p, v.deep, surface));
   return contrast(page, tile);
 }
@@ -161,4 +164,22 @@ test("the floor is a real check — it fails on the numbers that shipped before"
   const before = contrast(page, tile);
   assert.ok(before < 1.15, `Citrus used to be ${before.toFixed(3)}`);
   assert.ok(ratioFor("citrus", false) > before, "and it is better now");
+});
+
+test("the page tint is what keeps a deep page from turning grey", () => {
+  // Dustin approved the strongest of five stops, which sinks the page 24%
+  // toward near-black. Sinking alone desaturates: at 24% with no tint Citrus
+  // lands on a grey. The tint mixes the scheme's own primary back in, and
+  // this is the check that it is actually doing that rather than sitting at
+  // its no-op default.
+  const chroma = (c: RGB) => Math.max(...c) - Math.min(...c);
+  const p = hex(PAL.citrus["--brand-primary"]);
+  const bg = hex(PAL.citrus["--brand-bg"]);
+  const sunk = mix(hex("#070A10"), LIGHT.sink, bg);
+  const tinted = mix(p, LIGHT.tint, sunk);
+  assert.ok(LIGHT.tint > 0, "the light page carries some of its own scheme");
+  assert.ok(
+    chroma(tinted) > chroma(sunk) + 4,
+    `tint added only ${(chroma(tinted) - chroma(sunk)).toFixed(1)} of chroma — the page is going grey`,
+  );
 });

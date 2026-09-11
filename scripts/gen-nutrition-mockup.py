@@ -610,11 +610,11 @@ CONTROLS = """
     <button data-m="dark" aria-pressed="false">Dark</button>
   </div>
   <div class="mk-seg"><span>BACKGROUND</span>
-    <button data-s="was" aria-pressed="false">Was</button>
-    <button data-s="now" aria-pressed="true">Live now</button>
+    <button data-s="was" aria-pressed="false">Original</button>
+    <button data-s="first" aria-pressed="false">First fix</button>
     <button data-s="more" aria-pressed="false">More</button>
     <button data-s="strong" aria-pressed="false">Strong</button>
-    <button data-s="most" aria-pressed="false">Strongest</button>
+    <button data-s="now" aria-pressed="true">Live now</button>
   </div>
   <span class="mk-read" id="mk-read"></span>
   <span class="mk-read" id="mk-sepnote"></span>
@@ -744,11 +744,14 @@ JS = """
      is for.
 
      The ranges each stop produces across the twenty-three light schemes:
-       was       1.130 – 1.209   the merge he reported in the first place
-       live now  1.292 – 1.416   shipped 11 Sep
+       original  1.130 – 1.209   the merge he reported in the first place
+       first fix 1.292 – 1.416   shipped earlier on 11 Sep, still not enough
        more      1.496 – 1.749
        strong    1.657 – 1.973
-       strongest 1.836 – 2.230
+       live now  1.836 – 2.230   APPROVED and shipped — "use strongest"
+
+     The other four stay so the decision can be walked back or nudged without
+     rebuilding the sheet.
 
      LIGHT SCHEMES ONLY. A dark page is a different problem — its page is
      already near black, so sinking moves nothing and the TILE lifts instead —
@@ -756,10 +759,10 @@ JS = """
      down and the dark block's own numbers apply. */
   var SEP = {
     was:    ['6%%',  '0%%', '4%%'],
-    now:    ['12%%', '0%%', '4%%'],
+    first:  ['12%%', '0%%', '4%%'],
     more:   ['16%%', '4%%', '0%%'],
     strong: ['20%%', '6%%', '0%%'],
-    most:   ['24%%', '8%%', '0%%']
+    now:    ['24%%', '8%%', '0%%']
   };
   var sep = 'now';
 
