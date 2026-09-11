@@ -80,7 +80,6 @@ type SheetState =
   | { kind: "mymeals"; at: number | null; replaceRowKey?: string }
   | { kind: "foodsearch"; target: "adjust" | "extra" | "slot" | "composer"; rowKey?: string }
   | { kind: "menu" }
-  | { kind: "trends" }
   | { kind: "versions" }
   | { kind: "forward" }
   | { kind: "extrapick" }
@@ -2473,7 +2472,6 @@ export default function NutritionV3Client(props: Props) {
           />
         );
       case "menu": return <MenuSheetView />;
-      case "trends": return <TrendsSheetView />;
       case "versions": return <VersionsSheetView />;
       case "forward": return <ForwardSheetView />;
       case "extrapick": return <ExtraPickSheetView />;
@@ -3124,7 +3122,6 @@ export default function NutritionV3Client(props: Props) {
       <Sheet title="Plan menu" subtitle={`${clientName}${activePlan ? ` · plan v${activePlan.version_number} (live)` : " · open plan"}`} onClose={closeAllSheets}>
         {activePlan && rowBtn("🛒", "Grocery & Prep", "Shopping list + prep sheet · Grocery PDF / Meal Prep PDF to send", () => { closeAllSheets(); setShowGrocery(true); })}
         {rowBtn("✦", "Build my own plan with AI", activePlan ? "Switch to your own plan — your current one is saved to history" : "Design your plan from scratch", () => replaceSheet({ kind: "buildplan" }))}
-        {rowBtn("📈", "Trends", "Averages + the same charts as today's progress page", () => replaceSheet({ kind: "trends" }))}
         {rowBtn("🗂", "Plan versions", "Current live + staged incoming — flips at midnight CT", () => { backSheet(); openVersions(); })}
         {activePlan && rowBtn("📅", "Week ahead", "Forward view · 1w / 4w / 8w / custom", () => replaceSheet({ kind: "forward" }))}
         {rowBtn("⭐", "My Meals", "Saved custom meals — reuse in any slot", () => replaceSheet({ kind: "mymeals", at: rows.length }))}
@@ -3133,22 +3130,11 @@ export default function NutritionV3Client(props: Props) {
     );
   }
 
-  function TrendsSheetView() {
-    return (
-      <Sheet title="Trends" subtitle="Averages live on your summary card · full charts on Progress" onClose={closeAllSheets} onBack={backSheet}>
-        <p className="text-sm mb-3" style={{ color: "var(--brand-text-secondary)" }}>
-          Your <b style={{ color: "var(--brand-text)" }}>summary card</b> up top carries the range averages (1W/2W/4W/8W/custom) with adherence % and logging rate. For the full weight · BF% · calorie &amp; adherence charts, open Progress.
-        </p>
-        <a href="/progress" className="block w-full py-3 rounded-2xl text-sm font-bold text-white text-center" style={{ background: "var(--brand-primary)" }}>
-          Open full charts — weight · BF% · calories · adherence ›
-        </a>
-        <p className="text-xs mt-3 rounded-xl p-2.5" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text-secondary)" }}>
-          Every log writes once → <b style={{ color: GREEN }}>meal_adherence_logs</b> → feeds every chart, the home ring and the trainer view. One source of truth.
-        </p>
-      </Sheet>
-    );
-  }
-
+  // TRENDS IS GONE. Dustin, 11 Sep 2026, walking the plan menu: "Let's remove
+  // that altogether. That is essentially the progress tab, so there's really no
+  // reason to have that there." The sheet was a paragraph and a link to
+  // /progress; the averages it pointed at live on the summary card, and the
+  // charts live on the Progress tab, which is one tap away in the bottom nav.
   function VersionsSheetView() {
     return (
       <Sheet title="Plan versions" subtitle="Live plan + history — your old plans stay here" onClose={closeAllSheets}>

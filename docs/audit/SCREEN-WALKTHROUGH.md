@@ -2590,7 +2590,7 @@ or "open plan". No trainer-only rows.
 | M0 | The sheet's **✕** / backdrop | close the menu | `closeAllSheets()` — closes **every** open sheet | **WORKS** — *"tapping the menu and closing the menu works just fine"* |
 | M1 | 🛒 **Grocery & Prep** | shopping list + prep sheet, Grocery / Meal Prep PDFs | closes the menu, opens the grocery overlay. Only shown when a plan is live | **WORKS** — *"everything in the grocery and prep works exactly as it's supposed to, including creating printable PDFs of everything. That one is all locked in."* |
 | M2 | ✦ **Build my own plan with AI** | design a plan from scratch | `buildplan` sheet — five options, walked below | **UNTESTED BY HIM** — his own plan is written outside the app (the orange lock). Testing from the Test Client account. *"As far as I can tell it does seem to be working."* |
-| M3 | 📈 **Trends** | averages + the progress charts | `trends` sheet: a paragraph and a link to /progress | **RETIRE** — *"Let's remove that altogether. That is essentially the progress tab, so there's really no reason to have that there."* |
+| M3 | ~~📈 **Trends**~~ | averages + the progress charts | was a paragraph and a link to /progress | **RETIRED, 11 Sep** — *"Let's remove that altogether. That is essentially the progress tab, so there's really no reason to have that there."* Row, sheet and its kind are deleted; Progress in the bottom nav is the replacement |
 | M4 | 🗂 **Plan versions** | current live + staged incoming | list of versions with LIVE / PENDING / ARCHIVED and "↩ Make this my plan again" | **WORKS, CHANGE REQUESTED** — *"It doesn't really tell you a whole lot just in that one tab. We should have a way to tap on that and open up a little more details on exactly what that plan looks like without actually clicking make this my plan again. That way if they want to reuse a previous plan they can look through the actual plans first instead of just a very brief small summary."* |
 | M5 | 📅 **Week ahead** | forward view 1w / 4w / 8w / custom | `forward` sheet | **WORKS** — *"good to go, able to see everything I need to see there."* |
 | M6 | ⭐ **My Meals** | saved custom meals | `mymeals` sheet | **WORKS** — *"When you create something with AI custom, it puts it in there as My Meals. I'm actually okay with that, I kinda like that. There is a way to delete them. That's perfect."* |
@@ -2650,7 +2650,7 @@ and never as a rule. Belongs with the AI pass, alongside the two findings above.
 
 **Every one of M1–M6 opens something with its own controls.** Each is walked as
 its own sub-batch after the seven rows above: the grocery overlay, `buildplan`,
-`trends`, `versions`, `forward`, `mymeals`. Those sub-inventories are built from
+`versions`, `forward`, `mymeals` (Trends retired). Those sub-inventories are built from
 the code when we reach them, not before.
 
 **Two things to watch as he taps:** M0 closes *everything* (so backing out of a
@@ -2660,10 +2660,11 @@ entirely on an open plan, which a client with no plan will never know existed.
 
 ### Batch 6 — the sheets, each its own pass
 
-Not yet inventoried control by control. There are **27 sheet kinds**:
+Not yet inventoried control by control. There are **26 sheet kinds** (`trends`
+retired 11 Sep):
 `menu`, `meal`, `addmeal`, `adjust`, `composer`, `copyto`, `copy`, `foodsearch`,
 `mymeals`, `offplan`, `replace`, `extrapick`, `extra`, `aiplan`, `saveplan`,
-`buildplan`, `versions`, `trends`, `forward`, `custom`, `openslot`, `slot`,
+`buildplan`, `versions`, `forward`, `custom`, `openslot`, `slot`,
 `swap`, `plan`, `good`, `push`, `insert`.
 
 The ones that carry real risk and should be walked first: **`offplan`** (photo /
