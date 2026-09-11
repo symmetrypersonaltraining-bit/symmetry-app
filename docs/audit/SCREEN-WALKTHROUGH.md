@@ -2423,16 +2423,73 @@ order, one batch at a time, and fill the last column in with his words.
 Everything below is on `/nutrition` and `/client-preview/nutrition`, which mount
 the same component. A row marked **T** is trainer-only.
 
-### Batch 1 — the top of the screen
+### Batch 1 — the top of the screen · WALKED 11 Sep 2026, client view
 
-| # | Control | What it should do | What it actually does |
-|---|---|---|---|
-| 1 | **Recipes** strip | opens `/recipes` | link, no state |
-| 2 | **‹** | back one day | `setSelectedDate(-1)`; every write follows the date on screen |
-| 3 | The date | shows Today, or the date + "past day" / "upcoming day" / "scheduled — plan vN" | display only |
-| 4 | **›** | forward one day | `setSelectedDate(+1)`; **future days are reachable** |
-| 5 | **⋯** | the plan menu sheet | `openSheet({kind:"menu"})` |
-| 6 | Incoming-plan banner | "plan vN starts <date> — tap for the version timeline" | `openVersions()`; only when a plan is dated ahead |
+| # | Control | What it should do | What it actually does | Verdict |
+|---|---|---|---|---|
+| 1 | **Recipes** strip | opens `/recipes` | link, no state. *"Works properly. Goes to the recipes in the system. Toggles for my personal ones, which should be individual to each client, and the shared library that everybody has access to."* | **WORKS** — two findings below |
+| 2 | **‹** | back one day | `setSelectedDate(-1)`; every write follows the date on screen | **WORKS** |
+| 3 | The date | shows Today, or the date + "past day" / "upcoming day" / "scheduled — plan vN" | display only. Today / past / upcoming seen while stepping; **"scheduled — plan vN" not seen** — no incoming plan on his account today | **WORKS** (scheduled label untested) |
+| 4 | **›** | forward one day | `setSelectedDate(+1)`; future days reachable | **WORKS** |
+| 5 | **⋯** | the plan menu sheet | `openSheet({kind:"menu"})` | **DEFERRED — its own audit.** *"Let's hold off on the plan menu sheet, do that completely separate after everything in this list… that's where I think we're going to run into that layered menu. One of the places I suspect we're going to need some pretty major adjustments or even rebuild."* |
+| 6 | Incoming-plan banner | "plan vN starts <date> — tap for the version timeline" | `openVersions()`; only when a plan is dated ahead. *"When I did have one, that was working on my app."* The tap → timeline is **untested** until his next incoming plan | **WORKS** (banner); timeline tap pending |
+
+**Findings from #1 that belong to later batches — captured here, built there:**
+
+- **The AI must be able to use the recipe library.** His words: *"When we get to the meal
+  plan builder, the AI meal plan builder needs to have access from this. If I tell it,
+  create me a meal plan using meals from the actual library and adjust the portions to
+  hit my macros that are already set in the system, that AI needs to be able to do that.
+  All the AI in here has to have access to these recipes, including Dustin's assistant —
+  that assistant could say, hey, you're not hitting your protein on average for the last
+  three weeks, try this meal from the library, put it in for lunch. We can expand this
+  library a lot more and get it more usable where people are actually using it."*
+  → applies to **#20 (COACH'S ASSISTANT)**, **#23 (Build me a plan)**, and the
+  **`aiplan`** sheet. Checked in step 0 of the AI pass; not built until then.
+- **No in-app way back from `/recipes` on desktop.** Phone hardware back works; the
+  desktop PWA (standalone, no browser chrome) has none. Recipes is not a bottom-tab
+  item for clients, so the only route back is tapping the Nutrition tab. His
+  question — a small universal back control — is answered in the interlude below
+  and **awaits his confirmation before anything is built.**
+
+#### #7 — the range toggles, and the divisor he asked me to verify
+
+Tapped: **Today / 1W / 2W / 4W / 8W / Custom all work.** He asked for the logic:
+
+> *"If I click two weeks, it needs to give me the average calories, protein, carbs and
+> fats for the entire last two weeks. All of the fourteen days added together divided
+> by fourteen, so I get an actual average of what I've been hitting per day. Pretty
+> sure it's already set up like that, but double check that logic for me."*
+
+**It is not set up like that, and it is deliberate.** `rangeAverages.ts:250`:
+
+    const denom = avgDates.length || 1;
+
+The average is the sum ÷ **the number of days that hold real food logs**, with today
+left out (his own 20 Aug ruling: a day that is not over is not a data point). So:
+
+| range | window | what is averaged |
+|---|---|---|
+| 2W | today − 13 … today | the finished days among those 14 that have food logged, ÷ that count |
+
+The difference only shows when a day is **unlogged**. Concrete case: 10 of the 13
+finished days logged at ~2,500 kcal, 3 days with nothing —
+
+| divisor | reads | means |
+|---|---|---|
+| ÷ logged days (**today**) | **2,500** | "on the days you logged, you averaged 2,500" |
+| ÷ 14 (his words) | **1,786** | treats each unlogged day as a **zero-calorie day** |
+
+The current design pairs "per logged day" with the separate **LOGGING RATE** figure
+(#16), which is exactly the split he ruled for adherence on 9 Sep — *"not logging,
+since we have the logging rate."* Dividing by 14 folds the missing days back in as
+zeros.
+
+**HIS CALL, not made yet.** The question to put to him: *a day you did not log —
+should it count as a zero, or be left out of the average?* Whichever he rules, the
+label on the tile has to say it (**"avg per logged day"** vs **"avg per day"**), and
+`weekly-context.ts` reads the same module so the coach's number moves with it.
+
 
 ### Batch 2 — the day tile (the bright one)
 
@@ -3279,3 +3336,53 @@ The search term is still the plain food name — "beef fajitas from Rivera's"
 finds nothing; "beef fajitas" finds the rows. Context reaches only the three
 judgement calls (pick, portion, estimate). Test:
 `tests/unit/aRestaurantPlateIsNotARetailServing.test.ts`.
+
+## Interlude — a way back from every screen  ·  11 Sep 2026
+
+Dustin, from his desktop, on `/recipes`: *"There is no actual back button from
+desktop, which is making me think this may be something we've already missed on
+other pages. What are your thoughts on putting an actual small back button on
+everything throughout the entire app so no matter which screen you're in, you
+always have a way to go back one page? Tell me what you think, and then I'll
+confirm."*
+
+### What is true today
+
+- **Android shell:** `BackButtonGuard.tsx` handles the hardware Back, and its
+  header already quotes his rule — *"Back needs to go to the previous screen
+  from every single screen in the app."* So this is not a new rule; it is an
+  existing one that only the Android shell honours.
+- **Phone browser / iOS:** the platform back works.
+- **Desktop PWA:** installed `standalone`, so **no browser chrome and no back at
+  all.** The only way off a non-tab page is a bottom-nav tab.
+- **How deep does the app actually go?** For a client, routes more than one level
+  under a tab are just `schedule/proposals` and `workout/[dayId]` (the logger —
+  off limits). Everything else that *feels* layered — the 27 Nutrition sheets — is
+  an overlay with its own close, not a route. So the "three or four pages deep,
+  need to go back one" case he is worried about barely exists as navigation. It
+  exists as sheets, and the sheet audit (Batch 6) is where that is checked.
+
+### Recommendation — yes, and narrowly
+
+A small **‹** at the top-left of the header on **any page that is not a
+bottom-tab root** (`/recipes`, `/schedule/proposals`, `/movement/…`, and so on —
+never on Home, Workout, Nutrition, Progress, Messages, Settings). One behaviour:
+
+1. If the previous history entry is inside the app → `history.back()`.
+2. If there is none (deep link, fresh PWA launch) → go to the page's **parent
+   tab**, so it can never do nothing.
+
+**What it must never do:** push an invented history entry so that Back "has
+somewhere to go". That is precisely the v2/v3 `BackButtonGuard` bug — a sentinel
+entry with the same URL re-rendered the identical screen and read as *"Back did
+nothing"*, and reloads re-armed it until every press was dead. The fix is a
+control that calls back or falls back, and never fabricates.
+
+**Risk: low.** It is chrome, built once in the shared shell (the same object
+`#18 "the chrome agrees with the page"` just fixed), it draws nothing on tab
+roots so no walked screen changes, and it is one test. It does not touch either
+logger.
+
+**Held for his confirmation.** His words: *"don't necessarily put that in
+there."* Nothing is built until he says so, and when he does it lands as its own
+commit after the Nutrition walk, not inside it.
