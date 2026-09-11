@@ -34,9 +34,14 @@ and do not create another one.
 > The biggest number left in the food work is keyword coverage: **68,383 rows
 > still say "1 serving"** (counted 9 Sep). Section 5, "Known gaps".
 
-Last updated: **11 Sep 2026, evening Central** · `main` = `951896e` plus the
-docs commit recording the investor proposal (`docs/investor/`).
+Last updated: **11 Sep 2026, night Central** · `main` = `62e4999` (the
+investor handoff, merged as PR #31 — it had been left on a branch).
 
+> 💼 **11 Sep night: nothing new from him yet.** The three opening items for
+> the next session are, in order: (1) his yes/no on the draw-as-needed facility
+> versus two fixed tranches, (2) any quotes for the docx's section 8 figures,
+> (3) the contract — still "hold." Then the app items below.
+>
 > 💼 **11 Sep was the investor proposal, not app code.** He presents to Lauren
 > Standefer on 12 Sep. The $274,000 proposal is in his Drive, the research and
 > the build script are in `docs/investor/`, and section 5 ("the investor
@@ -1042,9 +1047,12 @@ a number:
   in his Drive folder "Symmetry Investor Package"
   (folder `1hHNKot-R-HwhnL-kapj3oL1t91JqC64K`, file
   `1ebssiLYPAnzVMpVJ3tHgNGNQx7YuQbwk`). Built by
-  `docs/investor/build-proposal.js` (docx-js; `npm install docx@9` in a
-  scratch dir, then `node build-proposal.js`). Rebuild from the script, never
-  edit the .docx by hand.
+  `docs/investor/build-proposal.js` (docx-js). Rebuild from the script, never
+  edit the .docx by hand. Exact command, proven 11 Sep night:
+  `npm install docx@9` in a scratch dir, then
+  `NODE_PATH=<scratch>/node_modules node docs/investor/build-proposal.js out.docx`
+  — without `NODE_PATH` node looks for `docx` next to the script and fails.
+  Upload the result to the Drive folder above with the new date in the name.
 - **The working page:** `docs/investor/symmetry-launch-plan-v2.html`, published
   as an artifact at
   https://claude.ai/code/artifact/f5f7da52-e986-461e-bad6-cef96161f9d2 (v6).
