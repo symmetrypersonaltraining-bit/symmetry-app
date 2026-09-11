@@ -16,8 +16,14 @@ reading only that file, this one, `docs/BACKLOG.md` and
 `docs/audit/AUDIT-RESUME.md` picks up with nothing lost, and without asking him
 a single question he has already answered.
 
-Deeper background lives in `docs/audit/` and in the project's
-`claude/STANDING-RULE-INVARIANTS.md`.
+Deeper background lives in `docs/audit/`, in `docs/STANDING-RULE-INVARIANTS.md`
+(why bugs kept recurring, and the "STOP RE-REPORTING THESE" list) and in
+`docs/DB-READ-GUIDE.md` (how this schema actually behaves).
+
+**Switching from a Cowork session to Claude Code? Read
+`docs/START-HERE-CLAUDE-CODE.md` once.** It covers what changes, what retires,
+and the docs that were moved into this repo because Claude Code cannot read the
+Cowork project.
 
 ---
 
@@ -142,6 +148,6 @@ without them. Ignore it.
 
 Not the client, not the data, and never a request for him to explain again.
 Read the "STOP RE-REPORTING THESE" section of
-`claude/STANDING-RULE-INVARIANTS.md` before raising any roster or coverage
+`docs/STANDING-RULE-INVARIANTS.md` before raising any roster or coverage
 concern. That list exists because the same non-problems were reported back to
 him four and five times.
