@@ -69,7 +69,7 @@ Batch 1 commits (#40–#42).
 >   Drive converts to a native Doc. He said he will keep editing it in Drive, so
 >   the script is the seed, not the master.
 > - **Symmetry App Books (bookkeeping, P&L, loan, taxes)** (Google Sheet,
->   `1Qj2oKFQEOpUtAyApHfSDPh-tbITVsxV8XEfH_mDmkDc`) — eleven tabs: Settings,
+>   `1VmeA85OjZAgv54lfJGt_RdzyT2O7vNcqLhByr0vtqN4`) — eleven tabs: Settings,
 >   Categories, Ledger, ProfitLoss, BalanceSheet, Loan, Owners, SalesTax,
 >   Form1099, TaxSummary, Plan. He types on the Ledger only; everything else is
 >   formulas over it. Source: `docs/investor/build-books-xml.py` → uploaded as
@@ -78,6 +78,14 @@ Batch 1 commits (#40–#42).
 >   $300 example line: it lands in ProfitLoss Sep 2026, BalanceSheet cash
 >   −$300, Owners −$270/−$30 on the 90/10 split, TaxSummary line 20 and §195
 >   both $300, and the balance check reads exactly $0.00.
+>
+>   It is laid out to be read and edited: navy title bars, gold section
+>   banners, cream boxed cells for what he types and grey italic columns for
+>   what the sheet works out, with a legend on Settings and the Ledger split by
+>   two banners into "YOU TYPE HERE" (A–I) and "THE SHEET FILLS THESE IN" (J–Q).
+>   Two earlier uploads are **trashed**: the unstyled first cut, and a styled one
+>   whose every ARRAYFORMULA read blank — see the self-closing `<Cell/>` trap in
+>   section 6 before touching the builder's XML emitter.
 >
 >   **The projection sheet it replaced is gone.** Dustin, 11 Sep:
 >   *"spreadsheet is crap … if im going to do all of the accounting, that
@@ -1611,14 +1619,26 @@ In Google Sheets, `LET(aa, …)` or `LET(t, …)`, `x`, `z`, `ac` … evaluates 
 
 `text/csv` only ever makes **one** tab. For the eleven-tab books workbook the
 format that works is Excel's XML (`application/vnd.ms-excel`, the
-`<?mso-application progid="Excel.Sheet"?>` flavour) as **text**, 94 KB, no
-base64. `docs/investor/build-books-xml.py` writes it. Google's importer has four
-traps, each of which silently produced a wrong or rejected file:
+`<?mso-application progid="Excel.Sheet"?>` flavour) as **text**, 99 KB, no
+base64. `docs/investor/build-books-xml.py` writes it. There is no way to hand
+the tool a file: the whole workbook has to be typed into the `textContent`
+argument, so keep it under about 100 KB or the message hits the output limit.
+Google's importer has four traps, each of which silently produced a wrong or
+rejected file:
 
 - **Formulas must be R1C1.** A1 references are not converted. The script
   converts from A1 automatically; quoted strings are left alone.
-- **Every formula cell needs `<Data ss:Type="Number">0</Data>`.** Without the
-  cached value the cell *and the cells after it in that row* vanish.
+- **No `<Cell>` may be self-closing unless the next one has a `<Data>` child.**
+  A run of self-closing cells collapses into one on import: three adjacent
+  `<Cell ss:Formula="..."/>` cells arrived as a single cell holding the last
+  formula, with everything after them shifted left. So every formula cell
+  carries an empty `<Data/>` child it never reads. Drop it and every
+  ARRAYFORMULA in the workbook reads blank, the Ledger's worked-out columns stay
+  empty, and Owners shows `#REF!` — which is exactly what one upload on 11 Sep
+  did, after a "saves 8.6 KB" tidy-up removed the cached values. `<Data/>` with
+  no `ss:Type` is enough; a full `<Data ss:Type="Number">0</Data>` also works and
+  costs 6 KB more. Empty gap cells stay `<Cell/>`: a run of those is fine
+  *because* the formula cell that ends it now has a child.
 - **`ss:Index` is ignored** on `Row`, `Cell` and `Column`. Gaps must be written
   as explicit empty `<Row/>` and `<Cell/>` elements or everything shifts left.
 - **A `DataValidation` range past row 1000 fails the whole conversion** with
