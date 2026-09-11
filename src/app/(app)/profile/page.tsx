@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/auth/serverUser";
 import SignOutButton from "./SignOutButton";
+import BodyDetailsCard from "./BodyDetailsCard";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { coachForViewer } from "@/lib/coachIdentity";
 
@@ -13,7 +14,7 @@ export default async function ProfilePage() {
 
   const { data: client } = await supabase
     .from("clients")
-    .select("id, name, email")
+    .select("id, name, email, height_in, sex")
     .eq("auth_user_id", user.id)
     .maybeSingle();
 
@@ -90,6 +91,17 @@ export default async function ProfilePage() {
               </div>
             </div>
           </>
+        )}
+
+        {/* Height and sex — the two fields Dustin asked for on the profile,
+            11 Sep 2026. Only a client has a row to write; a trainer viewing
+            their own profile has none. */}
+        {client?.id && (
+          <BodyDetailsCard
+            clientId={client.id}
+            heightIn={client.height_in == null ? null : Number(client.height_in)}
+            sex={client.sex ?? null}
+          />
         )}
 
         {/* Account */}

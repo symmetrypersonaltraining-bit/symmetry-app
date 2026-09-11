@@ -18,6 +18,12 @@ interface AssessmentData {
   date_of_birth: string;
   emergency_contact_name: string;
   emergency_contact_phone: string;
+  // Height and sex — the assessment collects them and they land on the client
+  // record. Dustin, 11 Sep 2026: "if a trainer is starting the app, the
+  // assessment should get all of that information and put it in their profile."
+  height_ft: string;
+  height_in: string;
+  sex: string;
 
   // Medical
   medical_clearance: boolean;
@@ -72,6 +78,7 @@ interface AssessmentData {
 const defaultData: AssessmentData = {
   first_name: '', last_name: '', email: '', phone: '', date_of_birth: '',
   emergency_contact_name: '', emergency_contact_phone: '',
+  height_ft: '', height_in: '', sex: '',
   medical_clearance: false, has_pain: false, current_injuries: '',
   chronic_conditions: '', medications: '', pain_location: '',
   pain_onset: '', hip_issues: false, prior_surgeries: '',
@@ -206,13 +213,15 @@ function AssessmentForm() {
       const supabase = createClient();
       const { data: c } = await supabase
         .from("clients")
-        .select("name, email, phone, date_of_birth, injuries_limitations, injuries, primary_goal, secondary_goals, experience_level, days_per_week, training_frequency")
+        .select("name, email, phone, date_of_birth, height_in, sex, injuries_limitations, injuries, primary_goal, secondary_goals, experience_level, days_per_week, training_frequency")
         .eq("id", existingClientId)
         .maybeSingle();
       if (!on || !c) return;
       const row = c as Record<string, unknown>;
       const txt = (k: string) => (typeof row[k] === "string" ? (row[k] as string) : "");
       const name = txt("name").trim();
+      const hRaw = (row as Record<string, unknown>).height_in;
+      const hIn = hRaw == null || hRaw === "" ? null : Math.round(Number(hRaw));
       const sp = name.indexOf(" ");
       setExistingName(name || null);
       setData((prev) => ({
@@ -222,6 +231,9 @@ function AssessmentForm() {
         email: txt("email"),
         phone: txt("phone"),
         date_of_birth: txt("date_of_birth"),
+        height_ft: hIn != null ? String(Math.floor(hIn / 12)) : "",
+        height_in: hIn != null ? String(hIn % 12) : "",
+        sex: txt("sex"),
         current_injuries: txt("injuries_limitations") || txt("injuries"),
         primary_goal: txt("primary_goal"),
         secondary_goal: txt("secondary_goals"),
@@ -399,6 +411,19 @@ function AssessmentForm() {
         .from('client_assessments')
         .insert(Object.fromEntries(Object.entries(assessmentPayload as any).map(([k, v]) => [k, v === '' ? null : v])) as any);
       if (assessErr) throw assessErr;
+      // An existing client's height and sex go onto THEIR RECORD, not only the
+      // assessment row — "put it in their profile". A new client's arrive via
+      // /api/create-client-from-assessment with everything else.
+      if (existingClientId) {
+        const ft = Number(data.height_ft), inch = Number(data.height_in);
+        const body: { height_in?: number; sex?: string } = {};
+        if (Number.isFinite(ft) && ft > 0) body.height_in = Math.round(ft * 12 + (Number.isFinite(inch) ? inch : 0));
+        if (data.sex === 'male' || data.sex === 'female') body.sex = data.sex;
+        if (Object.keys(body).length) {
+          const { error: profErr } = await supabase.from('clients').update(body).eq('id', existingClientId);
+          if (profErr) throw profErr;
+        }
+      }
       router.push(existingClientId ? `/clients/${existingClientId}` : '/clients');
     } catch (e: any) {
       console.error('Save error:', e);
@@ -453,7 +478,21 @@ function AssessmentForm() {
                 className={inputClass}
               />
             </Field>
-            <div />
+            <Field label="Height">
+              <div className="flex gap-2">
+                <input type="number" min="3" max="8" inputMode="numeric" placeholder="ft" aria-label="height feet"
+                  value={data.height_ft} onChange={e => set('height_ft', e.target.value)} className={inputClass} />
+                <input type="number" min="0" max="11" inputMode="numeric" placeholder="in" aria-label="height inches"
+                  value={data.height_in} onChange={e => set('height_in', e.target.value)} className={inputClass} />
+              </div>
+            </Field>
+            <Field label="Sex">
+              <select value={data.sex} onChange={e => set('sex', e.target.value)} className={inputClass}>
+                <option value="">Select…</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </select>
+            </Field>
             <Field label="Emergency Contact Name">
               {VoiceInput({ field: "emergency_contact_name", placeholder: "John Smith" })}
             </Field>

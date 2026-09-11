@@ -195,8 +195,8 @@
       "id": "clients-screen",
       "chapter": "clients",
       "title": "The movement screen inside the assessment",
-      "text": "The third step is an overhead squat assessment. You tick what you actually see. Feet turning out, forward lean, knees caving, arms falling forward, a lateral shift, balance. The step before it now ends with what to work around. Chips for the ones that recur, then a box for anything those cannot hold, and one for trainer notes. Their coach reads all of it. And for somebody already on your roster, open their session: if they have no assessment the app stops you first and offers to do it, with their details filled in. Not now starts the session and asks again next time.",
-      "words": 104
+      "text": "The third step is an overhead squat assessment. You tick what you actually see. Feet turning out, forward lean, knees caving, arms falling forward, a lateral shift, balance. The step before it now ends with what to work around. Chips for the ones that recur, then a box for anything those cannot hold, and one for trainer notes. Their coach reads all of it. The first step also asks height and sex, which go straight onto the client's record. And for somebody already on your roster, open their session: if they have no assessment the app stops you first and offers to do it, with their details filled in.",
+      "words": 109
     },
     {
       "id": "clients-invite",

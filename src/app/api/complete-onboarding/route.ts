@@ -28,6 +28,12 @@ export async function POST(req: Request) {
     if (body.injuries_limitations) updates.injuries_limitations = body.injuries_limitations;
     if (body.current_weight) updates.current_weight = Number(body.current_weight);
     if (body.current_body_fat_pct) updates.current_body_fat_pct = Number(body.current_body_fat_pct);
+    // Height arrives as feet + inches and is stored as inches. Sex is one of
+    // the two the expenditure formulas have coefficients for, or nothing —
+    // anything else is dropped rather than stored (the column has a check).
+    const ft = Number(body.height_ft), inch = Number(body.height_in);
+    if (Number.isFinite(ft) && ft > 0) updates.height_in = Math.round(ft * 12 + (Number.isFinite(inch) ? inch : 0));
+    if (body.sex === "male" || body.sex === "female") updates.sex = body.sex;
 
     // Use supabase (user session) for UPDATE — covered by app_anon_all policy
     const { error: updateErr } = await supabase

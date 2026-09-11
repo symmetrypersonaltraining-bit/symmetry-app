@@ -494,7 +494,9 @@
     "is_test_account",
     "schedules_week_to_week",
     "access_revoked_at",
-    "access_override_until"
+    "access_override_until",
+    "height_in",
+    "sex"
   ],
   "daily_logs": [
     "id",

@@ -3543,3 +3543,32 @@ was **Lunch, which he had swapped for restaurant fajitas that day**.
 
 Test: `tests/unit/asWrittenMeansThePlanNotTheDay.test.ts`, red on all three
 before the change.
+
+## Interlude — height and sex belong on the client  ·  11 Sep 2026
+
+Found from the plan builder's consult, which was estimating daily expenditure
+with no height, no sex and no age to hand. There was nowhere to put them: the
+client record had neither column, and `skinfold_logs` carried age and sex per
+*reading* — which is why the body-fat screen defaults to 38 and "male".
+
+Dustin: *"make sure those missing columns, the height and sex, go into their
+actual profile page. Also make sure that gets added into the assessment page
+and the onboarding. Whenever somebody starts the app it should collect all of
+that information and put it in their profile. If a trainer is starting the app,
+the assessment should get all of that information and put it in their profile."*
+
+**Three doors, one record.** `clients.height_in` (inches) and `clients.sex`
+(`male` / `female`, checked — never stored as anything else, never guessed):
+
+| door | what changed | where it writes |
+|---|---|---|
+| **Onboarding** — Body Stats step | height (ft + in) and sex, beside weight and body fat | `/api/complete-onboarding` → the client's row |
+| **Assessment** — Personal details | height and sex after date of birth; prefilled for an existing client | new client: `/api/create-client-from-assessment` with everything else; existing client: the record is updated as well as the assessment row |
+| **Profile** | a *Body details* card with exactly these two fields, save button | the client's own row, under `client_update_own_clients` |
+
+**On rule 6.** `/profile`, `/assessment` and `/onboarding` have not been walked.
+They received these two fields at his explicit instruction and nothing else —
+the profile in particular had no editable field at all before, and now has two.
+Everything else on those screens is untouched and still waits for its walk.
+
+The trainer tutorial's assessment step says the first step asks height and sex.
