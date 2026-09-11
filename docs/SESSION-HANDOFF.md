@@ -34,21 +34,32 @@ and do not create another one.
 > The biggest number left in the food work is keyword coverage: **68,383 rows
 > still say "1 serving"** (counted 9 Sep). Section 5, "Known gaps".
 
-Last updated: **11 Sep 2026, night Central** · `main` = `62e4999` (the
-investor handoff, merged as PR #31 — it had been left on a branch).
+Last updated: **11 Sep 2026, late night Central** · `main` = the investor
+docs commit after `fe3a80f`.
 
-> 💼 **11 Sep night: nothing new from him yet.** The three opening items for
-> the next session are, in order: (1) his yes/no on the draw-as-needed facility
-> versus two fixed tranches, (2) any quotes for the docx's section 8 figures,
-> (3) the contract — still "hold." Then the app items below.
+> 💼 **11 Sep, late: the business plan and the accounting sheet are in his
+> Drive.** Both in the folder "Symmetry Investor Package"
+> (`1hHNKot-R-HwhnL-kapj3oL1t91JqC64K`), beside the finalised proposal:
+> - **Symmetry-Business-Plan-2026-09-12** (Google Doc,
+>   `1DS48LqMnWXOES9VUxDWUh1NtE9kC6SPF1SsEzmkCRRU`) — written from the
+>   proposal, every figure the same. Source: `docs/investor/build-business-plan.js`
+>   (docx-js) → `docs/investor/docx-to-html.py` → uploaded as `text/html`, which
+>   Drive converts to a native Doc. He said he will keep editing it in Drive, so
+>   the script is the seed, not the master.
+> - **Symmetry-App-Accounting-2026-09-12** (Google Sheet,
+>   `1HFFxNnqPMBHaCY6A6u8oHoNT8NOvc5cZvVJwxccQ_1E`) — one sheet, six sections
+>   (INPUTS, SUMMARY, PROJECTION, LOAN, P&L, ACTUALS), Google-native array
+>   formulas. Source: `docs/investor/build-accounting-csv.py` → uploaded as
+>   `text/csv`. Verified in Drive: base case breaks even Apr 2028 (month 14),
+>   balance $241,460, payment $4,781/mo, peak balance $240,060, interest
+>   $58,841 — within a few thousand of the proposal's rounded figures.
+> - He also has an Excel version of the same model as a file card in the chat
+>   (multi-tab, per-cell formulas); the Drive sheet is the one to keep up.
 >
-> 💼 **11 Sep was the investor proposal, not app code.** He presents to Lauren
-> Standefer on 12 Sep. The $274,000 proposal is in his Drive, the research and
-> the build script are in `docs/investor/`, and section 5 ("the investor
-> proposal for Lauren") has every decision he has already made. **The contract
-> was never found and he said "hold on contract."** The loan is a draw-as-needed
-> facility (decided 11 Sep, late; proposal rebuilt and finalised in Drive).
-> Open on it: the quotes listed in the docx's section 8.
+> **The contract is still on hold** ("Don't worry about the contract yet").
+> Quotes for the proposal's section 8 are still the open item on the investor
+> side. Section 6 has the two Drive gotchas that cost this session two hours.
+
 **The gate is fully green**: 0 errors in `src/`, **3,074 unit tests pass 0 fail**,
 `test-nutrition-ai.cjs` **43 passed 0 failed**, build compiles. Shipped since the
 9 Sep merges: the access rule and its switch, the two red nutrition-AI tests
@@ -1094,6 +1105,11 @@ insurance, hosting list prices, average trainer price, Apple link-out fee). When
 he brings a quote: change the number in `build-proposal.js` and the HTML, rerun,
 re-upload to the same Drive folder with the new date in the name.
 
+**Delivered 11 Sep, late — see the top block:** the business plan (Google
+Doc) and the accounting sheet (Google Sheet) in the same Drive folder, built by
+`docs/investor/build-business-plan.js`, `docx-to-html.py` and
+`build-accounting-csv.py`. Contract still on hold at his word.
+
 **Also delivered 11 Sep in chat:** the copy/paste text for his client Sariah
 (her husband is COO of a software company; he is looking for one senior
 full-stack TypeScript/Next.js/Supabase/Stripe developer, January start, side
@@ -1407,6 +1423,29 @@ shipped as `234619c8`.)
   asserting a string is absent, or the file's own explanation fails the test.
 
 ---
+
+### The Google Drive tool cannot carry a binary file — 11 Sep
+
+`create_file` takes the bytes inline as base64. Anything over about 7 KB
+(a docx, an xlsx) arrived corrupt every time — five attempts, "invalid
+argument" or "not a valid base64 string" — while a 3–6 KB test file went
+through. **Do not try again.** Upload text instead: `text/html` becomes a Google
+Doc (the business plan went that way, 35 KB, complete), `text/csv` becomes a
+Google Sheet **and keeps formulas**. A binary the user must have goes to him
+with `SendUserFile` and he saves it to Drive himself. Google Sheets evaluates
+`ARRAYFORMULA`, `SCAN`, `LAMBDA`, `LET`, `SEQUENCE`, `MAP`, `REGEXEXTRACT` from
+a CSV or an xlsx import, so a whole model can be one formula per column.
+
+### `LET` names that look like columns break the formula — 11 Sep
+
+In Google Sheets, `LET(aa, …)` or `LET(t, …)`, `x`, `z`, `ac` … evaluates to
+`#ERROR!` with no message; prefix the names (`qBal`, `qAA`). Cost an hour.
+
+### LibreOffice is dead in the Claude Code sandbox — 11 Sep
+
+`soffice` says "source file could not be loaded" for every file, including a
+docx it had rendered the day before. `recalc.py` and the docx render check do
+not work here. `pip install formulas` evaluates an xlsx locally instead.
 
 ## 7. KEEPING THIS FILE TRUE
 
