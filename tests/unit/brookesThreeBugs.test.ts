@@ -119,9 +119,16 @@ test("the tolerance is the one the prompt promises", () => {
 test("the draft screen prints what the plan actually comes to", () => {
   // The target was shown; the total never was. That is the whole reason a
   // 38g miss could sit on screen looking authoritative.
+  //
+  // It arrived as a banner over the target boxes. On 11 Sep 2026 it moved INTO
+  // them, one number per target — Dustin: *"nineteen hundred calories out of
+  // eighteen fifty calories… And then we don't need that banner at all."*
   const ui = readFileSync(join(ROOT, "src/app/(app)/nutrition/v3/NutritionV3Client.tsx"), "utf8");
-  assert.match(ui, /This plan comes to/, "the draft no longer shows its own totals");
-  assert.match(ui, /targetsMet === false/, "a mismatch is not called out");
+  assert.match(ui, /actual=\{draft\.totals\}/, "the draft no longer shows what it comes to");
+  const editor = readFileSync(join(ROOT, "src/components/nutrition/TargetEditor.tsx"), "utf8");
+  assert.match(editor, /\{Math\.round\(actual\[key\]\)[^\n]*of \{Math\.round\(value\[key\]\)/,
+    "each box reads as what it is, then what it is aiming at");
+  assert.match(editor, /onTarget\(key, actual\[key\], value\[key\]\)/, "a mismatch is not called out");
 });
 
 // ---------------------------------------------------------------------------
