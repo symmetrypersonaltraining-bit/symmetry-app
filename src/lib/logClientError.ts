@@ -49,7 +49,7 @@
 
 import { logAppError } from "@/lib/logAppError";
 
-export type ClientErrorScope = "set_log" | "bulk_set_log" | "workout_complete";
+export type ClientErrorScope = "set_log" | "bulk_set_log" | "workout_complete" | "workout_log";
 
 export async function logClientError(opts: {
   clientId: string | null | undefined;

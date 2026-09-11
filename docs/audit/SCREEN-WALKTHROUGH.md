@@ -3176,3 +3176,21 @@ his Thursdays were invisible to it by construction.
 | he moves a booking in Google Calendar | the marked workout follows it (unchanged) | the marked workout follows it, and is never unmarked out from under the move |
 | a session he simply hasn't put on the calendar yet | shown as with-you | shown until his booked horizon passes it, then unmarked — the workout stays, the calendar is the truth |
 | a client flagged online-only | the calendar machinery skips them (unchanged) | unchanged — Tyler carries that flag and 108 Mondays; put to him |
+
+## Interlude — a failed tick clears when the next one saves (11 Sep)
+
+Dustin, mid-session on Bulk — Legs, exercise 11 of 17: *"new row violates
+row-level security policy for table workout_logs … when this happens error
+doesnt clear once it works."* His log had existed since 10:43 with 24 sets on
+it. One tick went out without his login attached; the lookup for the log came
+back empty, the logger inserted, and the insert was refused. The next tick
+carried the login and saved.
+
+| Control | Before | Now |
+|---|---|---|
+| Set tick, after an earlier tick failed | the red banner (it is `completeError`) stayed until **Complete** was tapped | a tick that saves clears it |
+| Set tick, refused as anonymous (`42501`) | the refusal was shown | the client is asked for its session and the insert is tried once more; only a second refusal is shown |
+| Refused `workout_logs` insert | left no trace | recorded in `app_error_log` under scope `workout_log`, with the error code and whether the retry ran |
+
+Per-item permission given for all three ("all 3"). Test:
+`tests/unit/aFailedTickClearsWhenTheNextOneSaves.test.ts`.

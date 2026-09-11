@@ -27,6 +27,7 @@ export type AppErrorScope =
   | "set_log"
   | "bulk_set_log"
   | "workout_complete"
+  | "workout_log"      // the workout_logs insert itself, added 11 Sep
   // the broad net
   | "render"          // a React error boundary caught it
   | "unhandled"       // window.onerror
