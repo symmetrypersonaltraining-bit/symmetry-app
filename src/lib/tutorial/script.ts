@@ -251,11 +251,12 @@ export const TUTORIAL: TutorialChapter[] = [
         id: "account-appearance",
         title: "Make it yours",
         body: [
-          "Settings has a colour theme picker and a depth setting that controls how much glow and shadow the interface uses. Both are yours alone — a client never sees your theme.",
+          "Settings has a colour theme picker, a Light or dark switch above it, and a depth setting that controls how much glow and shadow the interface uses. All three are yours alone — a client never sees your theme.",
+          "Light or dark applies to whichever scheme you pick. The dark schemes get a light version and the light ones get a dark version, each keeping its own colour. Auto follows the phone, and it is per device: your phone can sit on dark while a laptop stays light.",
           "Sounds and vibration are in the Experience card, also device-local. Turn them off if you train in a quiet room.",
         ],
         narration:
-          "Settings has a colour theme picker, and a depth setting that controls how much glow and shadow the interface uses. Both are yours alone. Your clients never see your theme. Sounds and vibration are in the Experience card, and they are per device too. Turn them off if you train somewhere quiet.",
+          "Settings has a colour theme picker, a light or dark switch above it, and a depth setting that controls how much glow and shadow the interface uses. All three are yours alone. Your clients never see your theme. Light or dark applies to whichever scheme you pick — the dark schemes get a light version and the light ones get a dark version, each keeping its own colour. Auto follows the phone, and it is per device. Sounds and vibration are in the Experience card, and they are per device too. Turn them off if you train somewhere quiet.",
         route: "/settings",
         routeLabel: "Open Settings",
         audioUrl: null,

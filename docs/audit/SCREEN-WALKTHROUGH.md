@@ -3733,3 +3733,99 @@ last keystroke.** Same oversight, same shape, now the same rule in both places.
 place* (add + remove does it today), rebuilding one meal with AI to a per-meal
 target, reordering meals, and an explicit before/after delta against the
 draft's own targets.
+
+### Round three — the numbers had to be readable while he edited  ·  11 Sep 2026
+
+Three reports off the same screen, in the order he hit them.
+
+**1. "It adjusts the calories when I add, and it does not take them off when I
+remove."**
+
+> *"I added chicken to one meal and then removed it… it does adjust the
+> calories on the plan that it does not remove when I remove it. That needs to
+> be confirmed first. Pause when you can and make this priority because I can't
+> really move forward on this audit until this is done."*
+
+The draft arithmetic all lived inside a 4,500-line screen file, so the first
+move was to take it out: `src/lib/nutrition/draftEdit.ts` now owns
+`recomputeDraft` and every edit that feeds it, and `tests/unit/draftEdit.test.ts`
+runs his exact sequence — load, add, remove, revert. Add-then-✕ was already
+correct and the test proves it stays that way.
+
+What reproduced was the other way of removing a food: **clearing the amount
+box.** `scaleItemTo` ran three different cases through one guard, so an item
+with no amount kept every macro it had. "6 oz chicken, 204 cal" became
+" oz chicken, 204 cal" and the 204 stayed in the total behind an empty box.
+The three cases are now separate:
+
+| what you did | what happens |
+|---|---|
+| cleared the amount of a food that had one | its macros go to zero — there is no such thing as "some" of a food in a total |
+| typed an amount | macros scale from the ORIGINAL, never compounding |
+| an item that never had an amount ("to taste") | macros stay — they ARE the item, and a typed number cannot scale what has no baseline |
+
+Clearing 6 to type 8 dips the total for one keystroke. That is deliberate: it
+is the honest reading of a box that says nothing at that instant, and it is the
+only version where the printed total is never a number the plan is not.
+
+**2. The two banners were both moving, so neither was a comparison.**
+
+> *"Recommended needs to stay what the AI originally recommended on this draft…
+> The banner under that that says this plan comes to, that's the one that needs
+> to auto adjust. So we have a comparison."*
+
+**Recommended** read `draft.targets` — which he can edit in the box below it.
+So the moment he moved a target, the recommendation silently became whatever he
+had just typed, sitting next to the AI's unchanged sentence explaining it. It
+is now frozen to the draft **as it arrived** and never moves again.
+
+**3. …and then the second banner went away entirely.**
+
+> *"What if we have the targets where they are and then have a slash and then
+> the calories of what's actually in the meal plan? … The first number on those
+> needs to be the one that changes. So the actual target is the second number…
+> nineteen hundred calories out of eighteen fifty calories. That way I can see
+> that I went over on my calories, and I need to make a fine tune adjustment to
+> fix it. And then we don't need that banner at all."*
+
+Done, and the banner is gone. Each of the four target boxes now carries
+**`1,900 of 1,850`** underneath it — what the plan is, then what it is aiming
+at — and the number turns red when that one field is out. The tolerance is the
+server's own (`planTargetDrift`: 3% or 30 kcal on calories, 5g per macro), so
+the box and the build agree about what "close" means.
+
+**4. Percentages stopped moving on their own.**
+
+> *"When I change one, it should not change the others. It should just show that
+> the others do not match up to a hundred percent until I adjust them manually…
+> and not allow you to save the plan until you adjust the rest of them."*
+
+The old behaviour rebalanced the other two on every keystroke, which kept the
+numbers valid and made a custom split impossible to type — reach for protein
+and carbs had already moved. A split is now **entered as a set**: the three
+boxes hold exactly what he types, they and the line under them go red with the
+running total ("These percentages come to 95%, not 100%"), nothing is applied
+to the grams, and **Accept is disabled** until they add up. Grams stay the one
+truth, because a split that is not a split never becomes grams.
+
+### The back button on his phone  ·  11 Sep 2026
+
+> *"My back button function on my mobile is all screwed up. If I hit back on my
+> phone from recipes, it signs me out and puts me on the sign in screen."*
+
+It does not sign anybody out. Chrome **restores an installed PWA's history
+across launches**, so Back can walk off the end of today's session and into a
+`/login` entry left over from a previous one — and it comes out of the
+back-forward cache, which means the middleware that redirects a signed-in
+visitor to `/home` never runs. A live session looking at a sign-in form.
+
+`/login` now answers for itself: on mount and on every `pageshow` (which is the
+event a bfcache restore fires, and the only one), a readable session replaces
+the page with `/home`.
+
+The second half — *"if I hit it from pretty much anywhere else, it goes back to
+the progress tab"* — is the same restored stack, and it is not harmful: those
+are real app screens he really did visit, just in a previous launch. Left alone
+for now rather than guessed at; if it still reads wrong once the sign-in bounce
+is live, the fix is to stamp each entry with an in-session depth so both back
+buttons stop at the launch entry and go Home instead.

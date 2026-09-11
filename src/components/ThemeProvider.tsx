@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { type Appearance, readAppearance, writeAppearance } from "@/lib/theme/appearance";
 
 export const THEMES = [
   { id: "pastel", label: "Soft Pastel", primary: "#7c9cf5", bg: "#f4f6fb" }, { id: "navy", label: "Navy Blue", primary: "#0F4C81", bg: "#EDF2F7" },
@@ -70,7 +71,23 @@ const ThemeContext = createContext<{
   /** Deeper colour + a glow behind every block. 0 = off. Opt-in. */
   depth: DepthLevel;
   setDepth: (level: DepthLevel) => void;
-}>({ theme: "pastel", setTheme: () => {}, depth: 0, setDepth: () => {} });
+  /**
+   * Light / Dark / Auto. Unlike the two above this is NOT saved to the
+   * account — see the note in lib/theme/appearance.ts. It lives here only so
+   * the Settings control re-renders when it changes; the attribute itself is
+   * applied by <AutoDark/>, which owns the luminance test that decides whether
+   * a given scheme needs overriding at all.
+   */
+  appearance: Appearance;
+  setAppearance: (a: Appearance) => void;
+}>({
+  theme: "pastel",
+  setTheme: () => {},
+  depth: 0,
+  setDepth: () => {},
+  appearance: "auto",
+  setAppearance: () => {},
+});
 
 export function useTheme() {
   return useContext(ThemeContext);
@@ -79,6 +96,7 @@ export function useTheme() {
 export default function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<ThemeId>("pastel");
   const [depth, setDepthState] = useState<DepthLevel>(0);
+  const [appearance, setAppearanceState] = useState<Appearance>("auto");
   const [clientId, setClientId] = useState<string | null>(null);
 
   function applyTheme(t: ThemeId) {
@@ -125,6 +143,7 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
       document.documentElement.setAttribute("data-theme", stored);
     }
     applyDepth(readStoredDepth());
+    setAppearanceState(readAppearance());
     (async () => {
       try {
         const sb: any = createClient();
@@ -210,8 +229,19 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
     }
   }
 
+  /**
+   * The write goes to localStorage and then fires the event AutoDark listens
+   * for. Nothing here touches data-appearance directly: a scheme that is
+   * already what you asked for must end up with NO attribute, and only
+   * AutoDark measures which case you are in.
+   */
+  function setAppearance(a: Appearance) {
+    setAppearanceState(a);
+    writeAppearance(a);
+  }
+
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, depth, setDepth }}>
+    <ThemeContext.Provider value={{ theme, setTheme, depth, setDepth, appearance, setAppearance }}>
       {children}
     </ThemeContext.Provider>
   );

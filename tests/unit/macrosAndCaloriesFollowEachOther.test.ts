@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fromGrams, gramsAtPct, pctOf, setGrams, setKcal, setPct } from "../../src/lib/nutrition/macroSplit";
+import { fromGrams, fromPct, gramsAtPct, pctOf, setGrams, setKcal, splitAddsUp } from "../../src/lib/nutrition/macroSplit";
 import { kcalOf } from "../../src/lib/nutrition/dailyTotals";
 
 /**
@@ -17,7 +17,8 @@ import { kcalOf } from "../../src/lib/nutrition/dailyTotals";
 const T = fromGrams(180, 230, 55); // 2,135 kcal — his own draft's shape
 
 test("calories are always 4/4/9 of the grams, whatever route you took", () => {
-  const ways = [T, setGrams(T, "c", 190), setKcal(T, 1800), setPct(T, "p", 35), setKcal(setPct(setGrams(T, "p", 200), "f", 25), 2400)];
+  const ways = [T, setGrams(T, "c", 190), setKcal(T, 1800), fromPct(T.kcal, { p: 35, c: 40, f: 25 }),
+    setKcal(fromPct(setGrams(T, "p", 200).kcal, { p: 30, c: 45, f: 25 }), 2400)];
   for (const t of ways) assert.equal(t.kcal, Math.round(kcalOf(t.p, t.c, t.f)), JSON.stringify(t));
 });
 
@@ -40,14 +41,30 @@ test("asking for fewer calories keeps the split and rescales the grams", () => {
   }
 });
 
-test("setting one macro's percentage holds the calories and rebalances the rest", () => {
-  const carbs40 = setPct(T, "c", 40);
-  assert.ok(Math.abs(carbs40.kcal - T.kcal) <= 4, "the calories are what stayed put");
-  assert.ok(Math.abs(pctOf(carbs40).c - 40) <= 1, "carbs are 40% of them");
-  // Protein and fat kept their ratio to each other while absorbing the rest.
-  const rBefore = (T.p * 4) / (T.f * 9);
-  const rAfter = (carbs40.p * 4) / (carbs40.f * 9);
-  assert.ok(Math.abs(rBefore - rAfter) < 0.05, `protein:fat held — ${rBefore.toFixed(2)} → ${rAfter.toFixed(2)}`);
+test("a percentage split holds the calories and is applied as a whole", () => {
+  // Dustin, 11 Sep 2026: *"when I change one, it should not change the others.
+  // It should just show that the others do not match up to a hundred percent
+  // until I adjust them manually."*
+  //
+  // It used to rebalance the other two on every keystroke, which kept the
+  // numbers valid and made a custom split impossible to type: reach for
+  // protein and carbs had already moved. So a split is now entered as a set
+  // and only applied when it IS one — the editor holds the boxes and colours
+  // them red until then.
+  const split = fromPct(T.kcal, { p: 30, c: 40, f: 30 });
+  assert.ok(Math.abs(split.kcal - T.kcal) <= 6, "the calories are what stayed put");
+  const got = pctOf(split);
+  for (const [k, want] of [["p", 30], ["c", 40], ["f", 30]] as const) {
+    assert.ok(Math.abs(got[k] - want) <= 1, `${k} came out ${got[k]}%, asked for ${want}%`);
+  }
+});
+
+test("a split that does not total 100 is never applied", () => {
+  const now = pctOf(T);
+  assert.equal(splitAddsUp(now), true, "what is on screen is a real split");
+  assert.equal(splitAddsUp({ ...now, p: now.p + 5 }), false, "one box moved on its own is not");
+  assert.equal(splitAddsUp({ p: 0, c: 0, f: 0 }), false, "and neither is nothing");
+  assert.equal(splitAddsUp({ p: 30, c: 45, f: 25 }), true);
 });
 
 test("the percentages read out of the grams, and sum to about 100", () => {
@@ -66,20 +83,24 @@ test("a zero or empty target never divides by nothing", () => {
   const empty = fromGrams(0, 0, 0);
   assert.deepEqual(pctOf(empty), { p: 0, c: 0, f: 0 });
   assert.equal(setKcal(empty, 2000).kcal, 2000, "no split to keep, so the grams are left alone");
-  assert.deepEqual(setPct(empty, "p", 40), empty, "no calories to take a percentage of");
+  assert.deepEqual(fromPct(0, { p: 30, c: 45, f: 25 }), empty, "no calories to take a percentage of");
 });
 
-test("a percentage on a target whose other two are zero splits the rest evenly", () => {
-  const onlyProtein = fromGrams(200, 0, 0); // 800 kcal
-  const half = setPct(onlyProtein, "p", 50);
-  assert.ok(Math.abs(half.kcal - 800) <= 8);
-  assert.ok(half.c > 0 && half.f > 0, "no ratio to keep, so neither is picked as a favourite");
+test("a split says what all three are, so a zero elsewhere is not a special case", () => {
+  // The old setPct had to guess what to do when the other two were zero. A
+  // whole split never needs to: he typed all three.
+  const half = fromPct(800, { p: 50, c: 25, f: 25 });
+  assert.equal(half.p, 100);
+  assert.equal(half.c, 50);
+  assert.equal(half.f, 22);
+  assert.ok(Math.abs(half.kcal - 800) <= 10);
 });
 
 test("nothing can be driven negative", () => {
   assert.equal(setGrams(T, "f", -40).f, 0);
   assert.equal(setKcal(T, -100).kcal, 0);
-  assert.ok(setPct(T, "c", 140).c > 0);
+  assert.deepEqual(fromPct(-2000, { p: 30, c: 45, f: 25 }), fromGrams(0, 0, 0));
+  assert.equal(fromPct(2000, { p: 30, c: 45, f: -25 }).f, 0);
 });
 
 test("typing a calorie number keystroke by keystroke does NOT zero the macros", () => {

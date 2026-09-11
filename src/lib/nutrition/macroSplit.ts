@@ -97,33 +97,30 @@ export function setKcal(t: MacroTargets, kcal: number, from: MacroTargets = t): 
 }
 
 /**
- * One macro set to a percentage of the CURRENT calories. The other two keep
- * their ratio to each other and absorb what is left.
+ * A WHOLE SPLIT AT ONCE — and only once it adds up.
  *
- * "Carbs to 40%" has to mean the calories stay put — otherwise the number he
- * just typed is not the thing that changed. The other two share the remaining
- * 60% in the proportion they already had, which is the only redistribution
- * that does not silently make a second decision for him.
+ * Dustin, 11 Sep 2026: *"if I change protein, it needs to make the other two
+ * carbs and fat needs to be red or some type of warning that they don't match
+ * up to a hundred percent until I adjust them manually… when I change one, it
+ * should not change the others."*
+ *
+ * The old `setPct` moved the other two to absorb the difference, which kept
+ * the numbers valid at every keystroke and made a custom split impossible to
+ * type: set protein to 30 and carbs moved on its own before you reached it.
+ *
+ * So percentages are now entered as a set. The editor holds the three boxes
+ * while they are being typed, colours them until they total 100, and calls
+ * this only when they do. Nothing is derived from a split that does not add
+ * up, which is what keeps grams the single truth — see the header.
  */
-export function setPct(t: MacroTargets, field: MacroKey, pct: number): MacroTargets {
-  const total = kcalOf(t.p, t.c, t.f);
-  if (total <= 0) return t;
-  const share = Math.min(100, Math.max(0, pct));
-  const mine = (total * share) / 100 / CALS_PER_G[field];
+export function fromPct(kcal: number, pct: Record<MacroKey, number>): MacroTargets {
+  const g = (k: MacroKey) => (Math.max(0, kcal) * Math.max(0, pct[k])) / 100 / CALS_PER_G[k];
+  return fromGrams(g("p"), g("c"), g("f"));
+}
 
-  const others = (["p", "c", "f"] as MacroKey[]).filter((k) => k !== field);
-  const otherCals = others.reduce((a, k) => a + t[k] * CALS_PER_G[k], 0);
-  const leftCals = total * (1 - share / 100);
-
-  const next = { ...t, [field]: mine } as MacroTargets;
-  if (otherCals <= 0) {
-    // Both others are zero, so there is no ratio to keep. Split what is left
-    // evenly rather than picking a favourite.
-    for (const k of others) next[k] = leftCals / 2 / CALS_PER_G[k];
-  } else {
-    for (const k of others) next[k] = ((t[k] * CALS_PER_G[k]) / otherCals) * leftCals / CALS_PER_G[k];
-  }
-  return fromGrams(next.p, next.c, next.f);
+/** Whether a set of three percentages is a split at all. */
+export function splitAddsUp(pct: Record<MacroKey, number>): boolean {
+  return pct.p + pct.c + pct.f === 100;
 }
 
 /**

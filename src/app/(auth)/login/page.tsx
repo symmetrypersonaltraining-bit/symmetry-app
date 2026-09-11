@@ -19,6 +19,43 @@ export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
 
+  /**
+   * ALREADY SIGNED IN? THEN THIS SCREEN IS A MISTAKE — LEAVE IT.
+   *
+   * Dustin, 11 Sep 2026, on the installed PWA: *"If I hit back on my phone
+   * from recipes, it signs me out and puts me on the sign in screen."* It does
+   * not sign anybody out. Chrome restores an installed PWA's history across
+   * launches, so Back can walk off the end of today's session and into a
+   * /login entry from a previous one — served straight out of the
+   * back-forward cache, which means the middleware that redirects a signed-in
+   * visitor to /home never runs.
+   *
+   * So the page answers for itself. On mount, and again on every `pageshow`
+   * (bfcache restores fire that and nothing else), a live session sends him
+   * where he was going. `replace`, not `push`, so Back does not bounce between
+   * the two.
+   *
+   * Not a redirect loop risk: the middleware sends a signed-in visitor to
+   * /home, and this only fires when a session is actually readable here.
+   */
+  useEffect(() => {
+    let stop = false;
+    const bounce = async () => {
+      try {
+        const { data } = await supabase.auth.getUser();
+        if (!stop && data?.user) router.replace("/home");
+      } catch {
+        /* no session to read — the form is the right thing to show */
+      }
+    };
+    void bounce();
+    const onShow = (e: PageTransitionEvent) => { if (e.persisted) void bounce(); };
+    window.addEventListener("pageshow", onShow);
+    return () => { stop = true; window.removeEventListener("pageshow", onShow); };
+    // supabase is a fresh client per render by design; the effect must not re-run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Native app (Capacitor) detection: password login works in the WebView,
   // but magic-link opens the external browser and never signs the app in.
   // So inside the native app we hide the magic-link option and use password only.

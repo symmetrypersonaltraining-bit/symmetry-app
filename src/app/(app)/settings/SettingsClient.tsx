@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useTheme, THEMES, DEPTH_LEVELS } from "@/components/ThemeProvider";
+import { APPEARANCES } from "@/lib/theme/appearance";
 import { AvatarSelf } from "@/components/Avatar";
 import PaymentsSettingsCard from "@/components/PaymentsSettingsCard";
 import BillingHistory from "@/components/BillingHistory";
@@ -55,7 +56,7 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
     setClassic(next);
     try { localStorage.setItem("symmetry_settings_classic", next ? "1" : "0"); } catch { /* fine */ }
   }
-  const { theme, setTheme, depth, setDepth } = useTheme();
+  const { theme, setTheme, depth, setDepth, appearance, setAppearance } = useTheme();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
   const [gcalSync, setGcalSync] = useState(gcalSyncEnabled ?? false);
@@ -191,6 +192,57 @@ export default function SettingsClient({ userEmail, userName, isTrainer,
 
       <section>
         <p className="section-header">App Color Theme</p>
+
+        {/* Light / Dark / Auto. Above the swatches rather than below, because
+            it changes what every swatch beneath it will look like.
+
+            Dustin, 11 Sep 2026: *"We had talked a while back about having a
+            toggle somewhere in the app for every color scheme. There should be
+            a light mode and a dark mode toggle. We do not have that that I'm
+            aware of right now."* The reading half had existed since July; this
+            is the half that writes it.
+
+            Same segmented shape as Depth & glow directly below: three named
+            stops, thumb-sized, no in-between values implied. */}
+        <div className="card p-4 mb-3">
+          <p className="text-sm font-semibold" style={{ color: "var(--brand-text)" }}>
+            Light or dark
+          </p>
+          <p className="text-xs mt-0.5 mb-3" style={{ color: "var(--brand-text-secondary)" }}>
+            Applies to whichever scheme you pick below — the dark schemes get a
+            light version and the light ones get a dark version, each keeping its
+            own colour. Auto follows your phone.
+          </p>
+          <div role="radiogroup" aria-label="Light or dark appearance" className="flex gap-1.5">
+            {APPEARANCES.map((a) => {
+              const on = appearance === a.value;
+              return (
+                <button
+                  key={a.value}
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => setAppearance(a.value)}
+                  className="flex-1 rounded-xl py-2 px-1 transition-all"
+                  style={{
+                    background: on ? "var(--brand-primary)" : "var(--brand-bg)",
+                    border: "1px solid " + (on ? "var(--brand-primary)" : "var(--brand-border)"),
+                    color: on ? "#fff" : "var(--brand-text)",
+                    cursor: "pointer",
+                  }}
+                >
+                  <span className="block text-sm font-bold">{a.label}</span>
+                  <span
+                    className="block text-[10px] font-medium mt-0.5"
+                    style={{ color: on ? "rgba(255,255,255,0.78)" : "var(--brand-text-secondary)" }}
+                  >
+                    {a.hint}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {THEMES.map((t) => {
             // Schemes added 2026-08-01 carry a third colour of their own. The

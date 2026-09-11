@@ -33,6 +33,11 @@ import { planTargetDrift } from "@/lib/ai/nutrition-json";
 import TargetEditor from "@/components/nutrition/TargetEditor";
 import { fromGrams, type MacroTargets } from "@/lib/nutrition/macroSplit";
 import { MISSING_LABEL, type MissingInput } from "@/lib/nutrition/expenditure";
+import {
+  addItemTo, keyDraft, patchItemAt, patchMealAt, removeItemAt, removeMealAt,
+  scaleItemTo, setDraftTargets,
+  type PlanDraft as DraftPlan, type DraftItem as DraftPlanItem,
+} from "@/lib/nutrition/draftEdit";
 import FoodSearchSheet from "./FoodSearchSheet";
 import ComposerSheet from "./ComposerSheet";
 import CoachChatSheet, { CoachActionItem, CoachActions } from "./CoachChatSheet";
@@ -3934,24 +3939,13 @@ function ForwardSheet({
   );
 }
 
-type DraftItem = PlanDraft["meals"][number]["items"][number];
-
-interface PlanDraft {
-  targets: { kcal: number; p: number; c: number; f: number };
-  reasoning: string | null;
-  // micros: the AI returns them (da30c87) and they must survive all the way to
-  // meal_items, or "full micronutrients" stops at the draft screen.
-  // `_k` is a stable per-item key added when the draft loads. It is what lets
-  // an amount scale from the item's ORIGINAL macros every time rather than
-  // compounding — type 170 → 1 → 17 → 170 and you get the numbers you started
-  // with. Removing an item cannot shift it, which an index would. The accept
-  // mapping picks fields explicitly, so it never reaches the database.
-  meals: { name: string; timing: string | null; items: { food: string; amount: number | null; unit: string | null; p: number; c: number; f: number; kcal: number; micros?: Record<string, number | null> | null; _k?: string }[] }[];
-  totals: { kcal: number; p: number; c: number; f: number };
-  /** Set by the server when the meals do not add up to the targets above them. */
-  targetsMet?: false;
-  drift?: { kcal: number; p: number; c: number; f: number };
-}
+/**
+ * The draft's shape and its arithmetic both live in lib/nutrition/draftEdit —
+ * see that file for why. Aliased here so the rest of this screen reads the
+ * same as it always did.
+ */
+type PlanDraft = DraftPlan;
+type DraftItem = DraftPlanItem;
 
 const CONSULT_QUESTIONS: { q: string; key: string; chips: string[] }[] = [
   { q: "What's the goal right now?", key: "goal", chips: ["Lose fat", "Recomp", "Build muscle"] },
@@ -3975,54 +3969,6 @@ const CONSULT_QUESTIONS: { q: string; key: string; chips: string[] }[] = [
  * was built, and there was nothing to adjust them with. Now there is, and it is
  * one editor for all three modes because they share this sheet.
  */
-
-/** Macros scale with the amount. Everything else about the item is left alone. */
-function scaleItemTo(base: DraftItem, amount: number | null): DraftItem {
-  const from = base.amount;
-  // No baseline to scale from — a "to taste" item, or a zero. Take the number
-  // and leave the macros where they are rather than dividing by nothing.
-  if (from == null || from === 0 || amount == null) return { ...base, amount };
-  const r = amount / from;
-  const micros = base.micros
-    ? Object.fromEntries(Object.entries(base.micros).map(([k, v]) => [k, v == null ? null : Math.round(v * r * 1000) / 1000]))
-    : base.micros;
-  return {
-    ...base,
-    amount,
-    p: Math.round(base.p * r * 10) / 10,
-    c: Math.round(base.c * r * 10) / 10,
-    f: Math.round(base.f * r * 10) / 10,
-    kcal: Math.round((base.kcal || kcalOf(base.p, base.c, base.f)) * r),
-    micros,
-  };
-}
-
-/**
- * Totals and the target check, recomputed from the items after every edit.
- *
- * `planTargetDrift` is the SERVER's check, imported rather than reimplemented —
- * the same 3% on calories and 5g per macro the prompt demands. A second
- * tolerance invented here is how "within 3%" becomes 24%.
- */
-function recomputeDraft(d: PlanDraft): PlanDraft {
-  const totals = { kcal: 0, p: 0, c: 0, f: 0 };
-  for (const m of d.meals) {
-    for (const it of m.items) {
-      totals.p += it.p || 0;
-      totals.c += it.c || 0;
-      totals.f += it.f || 0;
-      totals.kcal += it.kcal || kcalOf(it.p || 0, it.c || 0, it.f || 0);
-    }
-  }
-  totals.kcal = Math.round(totals.kcal);
-  totals.p = Math.round(totals.p * 10) / 10;
-  totals.c = Math.round(totals.c * 10) / 10;
-  totals.f = Math.round(totals.f * 10) / 10;
-  const next: PlanDraft = { ...d, totals };
-  const { ok, drift } = planTargetDrift(next as never);
-  if (ok) { const { targetsMet: _t, drift: _d, ...clean } = next; return clean as PlanDraft; }
-  return { ...next, targetsMet: false, drift };
-}
 
 function AiPlanSheet({
   mode, clientId, clientName, saving, onAccept, onClose, onBack,
@@ -4085,26 +4031,15 @@ function AiPlanSheet({
   const [gap, setGap] = useState({ sex: "", dob: "", ft: "", inch: "", weight: "" });
   const [savingGap, setSavingGap] = useState(false);
   const [edited, setEdited] = useState(false);
+  // False while the percentage boxes are mid-edit and do not total 100.
+  const [splitOk, setSplitOk] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
   /** Stamp keys on a fresh draft and remember each item as it arrived. */
   function loadDraft(plan: PlanDraft) {
-    const base: Record<string, DraftItem> = {};
-    const keyed: PlanDraft = {
-      ...plan,
-      meals: plan.meals.map((m, mi) => ({
-        ...m,
-        items: m.items.map((it, ii) => {
-          const _k = `${mi}:${ii}`;
-          const withKey = { ...it, _k };
-          base[_k] = withKey;
-          return withKey;
-        }),
-      })),
-    };
+    const { draft: fresh, baseItems: base } = keyDraft(plan);
     setBaseItems(base);
     setEdited(false);
-    const fresh = recomputeDraft(keyed);
     setAiOriginal(fresh);
     setDraft(fresh);
   }
@@ -4112,23 +4047,17 @@ function AiPlanSheet({
   /** Replace one item in place, then recompute everything above it. */
   function patchItem(mi: number, ii: number, next: DraftItem) {
     setEdited(true);
-    setDraft((d) => d && recomputeDraft({
-      ...d,
-      meals: d.meals.map((m, i) => i !== mi ? m : { ...m, items: m.items.map((it, j) => (j === ii ? next : it)) }),
-    }));
+    setDraft((d) => d && patchItemAt(d, mi, ii, next));
   }
 
   function removeItem(mi: number, ii: number) {
     setEdited(true);
-    setDraft((d) => d && recomputeDraft({
-      ...d,
-      meals: d.meals.map((m, i) => i !== mi ? m : { ...m, items: m.items.filter((_, j) => j !== ii) }),
-    }));
+    setDraft((d) => d && removeItemAt(d, mi, ii));
   }
 
   function removeMeal(mi: number) {
     setEdited(true);
-    setDraft((d) => d && recomputeDraft({ ...d, meals: d.meals.filter((_, i) => i !== mi) }));
+    setDraft((d) => d && removeMealAt(d, mi));
   }
 
   /**
@@ -4161,10 +4090,7 @@ function AiPlanSheet({
     setBaseItems((b) => ({ ...b, [_k]: item }));
     setEdited(true);
     setAddingTo(null);
-    setDraft((d) => d && recomputeDraft({
-      ...d,
-      meals: d.meals.map((mm, i) => (i === mi ? { ...mm, items: [...mm.items, item] } : mm)),
-    }));
+    setDraft((d) => d && addItemTo(d, mi, item));
   }
 
   /** Back to the AI's draft, exactly as it arrived. */
@@ -4176,12 +4102,7 @@ function AiPlanSheet({
 
   function patchMeal(mi: number, field: "name" | "timing", value: string) {
     setEdited(true);
-    // Through recomputeDraft even though a name changes no macros. Dustin,
-    // 11 Sep: *"if I edit anything, the logic auto adjusts everything."* Making
-    // that unconditional costs one no-op call and means no future edit path can
-    // be the one that forgot — which is how the totals and the meals drift
-    // apart in the first place. A test holds it.
-    setDraft((d) => d && recomputeDraft({ ...d, meals: d.meals.map((m, i) => (i === mi ? { ...m, [field]: value } : m)) }));
+    setDraft((d) => d && patchMealAt(d, mi, field, value));
   }
 
   const label = mode === "targets" ? "AI draft" : mode === "foods" ? "my foods" : "coach consult";
@@ -4397,36 +4318,41 @@ function AiPlanSheet({
 
       {draft && (
         <>
-          {draft.reasoning && (
+          {/* WHAT THE COACH RECOMMENDED, FROZEN.
+              Dustin, 11 Sep 2026: *"Recommended needs to stay what the AI
+              originally recommended on this draft… The banner under that that
+              says this plan comes to, that's the one that needs to auto adjust
+              if I change anything. So we have a comparison."*
+
+              It read `draft.targets`, which he can edit in the box below — so
+              the moment he moved a target the recommendation silently became
+              whatever he had just typed, next to the AI's unchanged words
+              explaining it. Two banners that both move are not a comparison.
+              This one is the draft AS IT ARRIVED and never moves again. */}
+          {aiOriginal?.reasoning && (
             <div className="rounded-xl p-3 mb-2 text-xs leading-relaxed" style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.4)", color: "var(--brand-text)" }}>
-              <b>Recommended: {draft.targets.kcal.toLocaleString()} kcal · {draft.targets.p}P / {draft.targets.c}C / {draft.targets.f}F.</b> {draft.reasoning}
+              <b>Recommended: {aiOriginal.targets.kcal.toLocaleString()} kcal · {aiOriginal.targets.p}P / {aiOriginal.targets.c}C / {aiOriginal.targets.f}F.</b> {aiOriginal.reasoning}
             </div>
           )}
 
-          {/* What the plan BELOW actually comes to. It was never shown, so a
-              target could sit above meals that missed it and nothing said so —
-              Brooke Orton was told 160g of protein and handed 198g. Always
-              printed, and called out when it does not match. */}
-          <div className="rounded-xl p-2.5 mb-2 text-xs leading-relaxed"
-            style={draft.targetsMet === false
-              ? { background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.5)", color: "var(--brand-text)" }
-              : { background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text-secondary)" }}>
-            <b style={{ color: "var(--brand-text)" }}>
-              This plan comes to {Math.round(draft.totals.kcal).toLocaleString()} kcal · {Math.round(draft.totals.p)}P / {Math.round(draft.totals.c)}C / {Math.round(draft.totals.f)}F
-            </b>
-            {draft.targetsMet === false && draft.drift ? (
-              <> — that misses the target by {draft.drift.kcal > 0 ? "+" : ""}{Math.round(draft.drift.kcal)} kcal
-                and {draft.drift.p > 0 ? "+" : ""}{Math.round(draft.drift.p)}g protein.
-                Adjust the amounts before you save it, or build it again.</>
-            ) : (
-              <> — matching the target.</>
-            )}
-          </div>
-          {/* THE TARGETS ARE HIS TO OVERRIDE. Typing a macro refills calories
-              4/4/9; calories stay hand-settable. */}
+          {/* THE TARGETS ARE HIS TO OVERRIDE, AND EACH ONE CARRIES WHAT THE
+              PLAN ACTUALLY COMES TO.
+
+              Dustin, 11 Sep 2026: *"nineteen hundred calories out of eighteen
+              fifty calories. That way I can see that I went over on my
+              calories, and I need to make a fine tune adjustment to fix it.
+              And then we don't need that banner at all."*
+
+              There WAS a banner — "This plan comes to 2,015 kcal…" — sitting
+              above these boxes and repeating in a sentence what the four
+              numbers now say each in its own place. It is gone. `actual`
+              is draft.totals, recomputed by every edit path in draftEdit.ts,
+              so adding a food, clearing an amount, removing an item or meal
+              and reverting the whole draft all move these numbers. */}
           <div className="mb-2">
-            <TargetEditor title="Targets — yours to change" value={draft.targets}
-              onChange={(t) => { setEdited(true); setDraft((d) => d && recomputeDraft({ ...d, targets: t })); }} />
+            <TargetEditor title="Targets — yours to change, against what the plan comes to"
+              value={draft.targets} actual={draft.totals} onSplitValid={setSplitOk}
+              onChange={(t) => { setEdited(true); setDraft((d) => d && setDraftTargets(d, t)); }} />
           </div>
 
           {draft.meals.map((dm, i) => {
@@ -4492,9 +4418,15 @@ function AiPlanSheet({
               ↩ Revert to what the coach came up with
             </button>
           )}
-          <button onClick={() => onAccept(draft, label)} disabled={saving}
-            className="w-full py-3 rounded-2xl text-sm font-bold text-white" style={{ background: "var(--brand-primary)" }}>
-            {saving ? "Creating your plan…" : `Accept — make it my ongoing plan ✓ (${clientName.split(" ")[0]})`}
+          {/* A split that does not total 100% is not a target, so it cannot be
+              saved as one. Dustin, 11 Sep: *"not allow you to save the plan
+              until you adjust the rest of them."* */}
+          <button onClick={() => onAccept(draft, label)} disabled={saving || !splitOk}
+            className="w-full py-3 rounded-2xl text-sm font-bold text-white"
+            style={{ background: "var(--brand-primary)", opacity: splitOk ? 1 : 0.45 }}>
+            {saving ? "Creating your plan…"
+              : !splitOk ? "Make the percentages total 100% first"
+              : `Accept — make it my ongoing plan ✓ (${clientName.split(" ")[0]})`}
           </button>
         </>
       )}

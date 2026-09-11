@@ -35,8 +35,8 @@ test("the targets are editable, through the one shared control", () => {
   // each other… set the macros by percentages and give a number in grams at
   // each percentage." That is TargetEditor, shared with the entry form, and
   // the arithmetic is macroSplit.ts — see macrosAndCaloriesFollowEachOther.
-  assert.match(SHEET, /<TargetEditor title="Targets — yours to change"/);
-  assert.match(SHEET, /onChange=\{\(t\) => \{ setEdited\(true\); setDraft\(\(d\) => d && recomputeDraft\(\{ \.\.\.d, targets: t \}\)\); \}\}/,
+  assert.match(SHEET, /<TargetEditor title="Targets — yours to change/);
+  assert.match(SHEET, /setDraft\(\(d\) => d && setDraftTargets\(d, t\)\)/,
     "an override recomputes the target check against the meals below it");
 });
 
@@ -157,9 +157,16 @@ test("EVERY edit recomputes the totals and the target check — no exceptions", 
   // path writes the draft without recomputing. A new edit added next month is
   // covered by it automatically, which is the only version of this guard worth
   // having.
+  //
+  // The arithmetic moved to lib/nutrition/draftEdit.ts on 11 Sep 2026, where it
+  // can be run by a test rather than only read. Every one of its edit helpers
+  // ends in recomputeDraft, so a write that goes through one of them cannot
+  // leave a stale total — and a write that goes through none of them is the
+  // thing this catches.
+  const EDITS = /(patchItemAt|removeItemAt|removeMealAt|addItemTo|patchMealAt|setDraftTargets|keyDraft)\(/;
   const writes = SHEET.match(/setDraft\(\(d\) => d &&[^\n]*/g) || [];
   assert.ok(writes.length >= 5, `found ${writes.length} draft writes — the matcher has probably stopped matching`);
   for (const w of writes) {
-    assert.match(w, /recomputeDraft\(/, `a draft write that does not recompute:\n  ${w.trim()}`);
+    assert.match(w, EDITS, `a draft write that does not go through draftEdit:\n  ${w.trim()}`);
   }
 });
