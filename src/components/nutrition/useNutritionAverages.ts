@@ -1,7 +1,8 @@
 "use client";
 
 // Nutrition v3 — shared range-averages hook. The single source for avg
-// kcal/P/C/F per logged day, adherence %, and logging rate over a range.
+// kcal/P/C/F PER DAY IN THE WINDOW (an unlogged day counts as zero — Dustin,
+// 11 Sep 2026, quoted in rangeAverages.ts), adherence %, and logging rate.
 // Extracted verbatim from AveragesStrip so the unified top card and any other
 // consumer produce identical numbers — all computed through the canonical
 // dailyTotals module.
@@ -30,6 +31,9 @@ export const AVG_RANGES: { key: RangeKey; label: string; days: number }[] = [
 export interface AveragesResult {
   loggedDays: number;
   totalDays: number;
+  /** Finished days in the window with nothing logged. They count as zero in kcal/p/c/f. */
+  unloggedDays: number;
+  unloggedDates: string[];
   kcal: number; p: number; c: number; f: number;
   /**
    * How well they hit the numbers, 0-100 — daily accuracy averaged over the
@@ -104,8 +108,17 @@ export function useNutritionAverages(
       // never sit in the denominator.
       start = weekToDateStart(today);
     } else {
+      // THE LAST N FINISHED DAYS — yesterday back, today not in the window.
+      //
+      // "2W" used to be today and the 13 days before it, with today then
+      // excluded from the averages: 13 finished days labelled as two weeks.
+      // Dustin, 11 Sep: *"all of the fourteen days added together divided by
+      // fourteen."* So the window is the fourteen days that have actually
+      // finished, and his 20 Aug ruling — a day that is not over is not a data
+      // point — is kept by never letting today into it at all.
       const rg = AVG_RANGES.find((x) => x.key === range)!;
-      start = shiftDate(today, -(rg.days - 1));
+      start = shiftDate(today, -rg.days);
+      end = shiftDate(today, -1);
     }
     const supabase = createClient();
     const [logsRes, targetRes, planRows] = await Promise.all([
@@ -162,10 +175,15 @@ export function useNutritionAverages(
     };
 
     const totalDays = diffDays(start, end) + 1;
+    // Every calendar date in the window, so the divisor is the finished days
+    // and the unlogged ones come back by name.
+    const windowDates: string[] = [];
+    for (let d = start; d <= end; d = shiftDate(d, 1)) windowDates.push(d);
     const sum = summariseLogRange(logs, pseudoMeals, {
       target: asMacro(tRow),
       targetForDate,
       windowDays: totalDays,
+      windowDates,
       // A DAY THAT IS NOT OVER IS NOT A DATA POINT.
       //
       // `excludeDates` has existed for this since the module was written, and
@@ -186,6 +204,8 @@ export function useNutritionAverages(
     setResult({
       loggedDays: sum.loggedDays,
       totalDays,
+      unloggedDays: sum.unloggedDays,
+      unloggedDates: sum.unloggedDates,
       kcal: sum.kcal, p: sum.p, c: sum.c, f: sum.f,
       adherence: sum.adherence,
       consistency: sum.consistency,

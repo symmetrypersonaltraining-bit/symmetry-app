@@ -2485,10 +2485,45 @@ The current design pairs "per logged day" with the separate **LOGGING RATE** fig
 since we have the logging rate."* Dividing by 14 folds the missing days back in as
 zeros.
 
-**HIS CALL, not made yet.** The question to put to him: *a day you did not log —
-should it count as a zero, or be left out of the average?* Whichever he rules, the
-label on the tile has to say it (**"avg per logged day"** vs **"avg per day"**), and
-`weekly-context.ts` reads the same module so the coach's number moves with it.
+**RULED, 11 Sep — ÷ 14, an unlogged day is a zero. Built the same day.**
+
+> *"Go ahead and rewrite that logic. I want it to go by all fourteen days. That
+> way there's a lot more incentive to never skip logging no matter what. Once we
+> make logging easier, that won't be an issue — because the fact is we need to
+> know the average even if they forgot to log. That's their problem. They screwed
+> up. So it needs to be an actual true average of the last fourteen days of
+> everything that's in the app. Even if they forgot to log, that day still counts
+> within that average."*
+
+And the half that keeps it honest, which is what the AI now reads:
+
+> *"Make sure the AI is aware of how that is set up. Let's say there's two days
+> that had nothing logged and it drops their average way down. The AI for
+> Dustin's assistant and for Your Week needs to be able to reference that and say
+> there was nothing logged on these two days — you need to get better at logging
+> if you actually ate those days and just didn't log. The AI needs to be aware of
+> that as a possibility always."*
+
+What changed, in one implementation (`rangeAverages.ts`) and the three things
+that read it:
+
+| | before | now |
+|---|---|---|
+| 2W window | today + 13 before, today then excluded → **13** finished days | the **14 finished days** before today; today never in the window (his 20 Aug ruling kept) |
+| divisor | days with food logged | **every finished day in the window** |
+| an unlogged day | invisible | **a zero**, and named by date |
+| the tile | no basis stated | *"avg per day over all 14 days · 2 unlogged days counted as 0"* |
+| the AI (Your Week, assistant) | *"averages per logged day"* | *"averages over ALL 14 finished days… 2 of those days had NOTHING logged (dates) and COUNT AS ZERO. If they ate on those days the true average is HIGHER. Say this plainly, name the days, tell them to log every day — do NOT coach a deficit off an average that is low because of missing logs."* |
+
+Adherence is untouched — it scores the days they *did* log against target, and
+he ruled that separately on 9 Sep. The old test asserting the opposite rule was
+rewritten to assert this one, with the reversal recorded in its own comment.
+
+**One second implementation found and left alone:** `NutritionAverages.tsx` has
+its own `denom = logged || 1`. It renders only for a trainer viewing a non-v3
+client, and **33 of 34 active clients are on v3** — the one that is not is the
+Demo Client. It is a RETIRE candidate for the trainer-side walk, not a change
+for this one.
 
 
 ### Batch 2 — the day tile (the bright one)

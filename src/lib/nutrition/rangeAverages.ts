@@ -109,9 +109,35 @@ export function dayHitScore(
 export interface RangeSummary {
   /** Distinct dates carrying at least one real log row. */
   loggedDays: number;
-  /** Days actually behind the averages (loggedDays minus any excluded date). */
+  /** Logged days actually inside the averages (loggedDays minus any excluded date). */
   avgDays: number;
-  /** Averages per averaged day. 0 when nothing is logged. */
+  /**
+   * Finished days in the window — THE DIVISOR for the averages when the caller
+   * gave a window. Null when it gave none (then the averages are per logged day,
+   * the only thing that is possible).
+   */
+  windowDays: number | null;
+  /** Finished days in the window with nothing logged. They count as ZERO. */
+  unloggedDays: number;
+  /** Those dates, "YYYY-MM-DD", so the AI can name them. Empty without `windowDates`. */
+  unloggedDates: string[];
+  /**
+   * AVERAGES PER DAY IN THE WINDOW — an unlogged day is a zero.
+   *
+   * Dustin, 11 Sep 2026: *"I want it to go by all fourteen days. That way
+   * there's a lot more incentive to never skip logging no matter what. We need
+   * to know the average even if they forgot to log. That's their problem. They
+   * screwed up. It needs to be an actual true average of the last fourteen days
+   * of everything that's in the app — even if they forgot to log, that day still
+   * counts within that average."*
+   *
+   * This REVERSES the previous rule, which divided by logged days so that "the
+   * five silent days" could not report a starving client. He has chosen the
+   * other side of that trade on purpose, and the AI is told about the zero days
+   * so it can say so rather than coach a deficit off them (see weekly-numbers).
+   *
+   * 0 when nothing is logged.
+   */
   kcal: number;
   p: number;
   c: number;
@@ -164,8 +190,19 @@ export interface SummariseOpts {
    * Calendar days in the window — the denominator for consistency. Without it
    * there is no honest "of how many days", so consistency stays null and
    * adherence falls back to the meal-status average.
+   *
+   * Prefer `windowDates`. This count cannot tell an excluded day that was
+   * unlogged from one that was logged, so it keeps an empty in-progress day in
+   * the divisor.
    */
   windowDays?: number;
+  /**
+   * The calendar dates in the window, "YYYY-MM-DD". The honest way to give the
+   * window: the averages divide by the finished days among these (excluded
+   * dates removed), and the unlogged ones are named in the result so the AI
+   * can tell the client which days count as zero. Overrides `windowDays`.
+   */
+  windowDates?: string[];
 }
 
 export function summariseLogRange(
@@ -249,15 +286,38 @@ export function summariseLogRange(
     }
   }
 
-  const denom = avgDates.length || 1;
-
-  // Consistency: logged days over days in the window. A date deliberately kept
-  // out of the averages comes out of the denominator too — today being half
-  // eaten is not the same as today being skipped, and charging someone for a
-  // day that hasn't finished yet is exactly the kind of wrong number this
-  // module exists to stop.
+  // THE DIVISOR IS THE WINDOW, NOT THE LOGGED DAYS.
+  //
+  // With `windowDates`: every finished day in the window (the excluded
+  // in-progress day removed, unless honouring that left nothing at all).
+  // A day with nothing logged contributes 0 to the sums above and still sits
+  // in the divisor — that is the ruling, quoted on `kcal`.
+  //
+  // With only `windowDays`: the old count-based version of the same idea. It
+  // cannot see WHICH days were excluded, so an empty in-progress day stays in
+  // the divisor. Kept for callers that have no dates; both live callers now
+  // pass dates.
+  //
+  // With neither: per logged day, because there is nothing else to divide by.
+  let finishedDates: string[] | null = null;
+  if (opts.windowDates) {
+    finishedDates = fellBack ? opts.windowDates.slice() : opts.windowDates.filter((d) => !excluded.has(d));
+  }
   const excludedInWindow = fellBack ? 0 : realDays.filter((d) => excluded.has(d)).length;
-  const windowDays = opts.windowDays == null ? null : Math.max(1, opts.windowDays - excludedInWindow);
+  const windowDays =
+    finishedDates ? Math.max(1, finishedDates.length)
+    : opts.windowDays == null ? null
+    : Math.max(1, opts.windowDays - excludedInWindow);
+  const denom = windowDays ?? (avgDates.length || 1);
+
+  const unloggedDates = finishedDates ? finishedDates.filter((d) => !totalsByDate[d]) : [];
+  const unloggedDays = finishedDates ? unloggedDates.length : windowDays == null ? 0 : Math.max(0, windowDays - avgDates.length);
+
+  // Consistency: logged days over finished days in the window. A date
+  // deliberately kept out of the averages comes out of the denominator too —
+  // today being half eaten is not the same as today being skipped, and charging
+  // someone for a day that hasn't finished yet is exactly the kind of wrong
+  // number this module exists to stop.
   const consistency = windowDays == null ? null : Math.min(1, avgDates.length / windowDays);
   const accuracy = hitDays ? hitSum / hitDays : null;
 
@@ -272,6 +332,9 @@ export function summariseLogRange(
   return {
     loggedDays: realDays.length,
     avgDays: avgDates.length,
+    windowDays,
+    unloggedDays,
+    unloggedDates,
     kcal: kcal / denom,
     p: p / denom,
     c: c / denom,
