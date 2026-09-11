@@ -28,6 +28,7 @@ import AiBadge from "@/components/AiBadge";
 import { pickPlanForDate } from "@/lib/nutrition/resolvePlan";
 import { groupedNutrients, pctOfDaily, splitNutrientsForStorage } from "@/lib/nutrition/nutrients";
 import Sheet from "./Sheet";
+import { planTargetDrift } from "@/lib/ai/nutrition-json";
 import FoodSearchSheet from "./FoodSearchSheet";
 import ComposerSheet from "./ComposerSheet";
 import CoachChatSheet, { CoachActionItem, CoachActions } from "./CoachChatSheet";
@@ -3929,12 +3930,19 @@ function ForwardSheet({
   );
 }
 
+type DraftItem = PlanDraft["meals"][number]["items"][number];
+
 interface PlanDraft {
   targets: { kcal: number; p: number; c: number; f: number };
   reasoning: string | null;
   // micros: the AI returns them (da30c87) and they must survive all the way to
   // meal_items, or "full micronutrients" stops at the draft screen.
-  meals: { name: string; timing: string | null; items: { food: string; amount: number | null; unit: string | null; p: number; c: number; f: number; kcal: number; micros?: Record<string, number | null> | null }[] }[];
+  // `_k` is a stable per-item key added when the draft loads. It is what lets
+  // an amount scale from the item's ORIGINAL macros every time rather than
+  // compounding — type 170 → 1 → 17 → 170 and you get the numbers you started
+  // with. Removing an item cannot shift it, which an index would. The accept
+  // mapping picks fields explicitly, so it never reaches the database.
+  meals: { name: string; timing: string | null; items: { food: string; amount: number | null; unit: string | null; p: number; c: number; f: number; kcal: number; micros?: Record<string, number | null> | null; _k?: string }[] }[];
   totals: { kcal: number; p: number; c: number; f: number };
   /** Set by the server when the meals do not add up to the targets above them. */
   targetsMet?: false;
@@ -3946,6 +3954,71 @@ const CONSULT_QUESTIONS: { q: string; key: string; chips: string[] }[] = [
   { q: "How fast do you want the scale to move?", key: "pace", chips: ["Steady & sustainable", "Aggressive", "Slow — protect performance"] },
   { q: "Activity outside training?", key: "activity", chips: ["Desk job", "On my feet all day", "Mixed"] },
 ];
+
+/**
+ * ── EDITING AN AI DRAFT BEFORE ACCEPTING IT ────────────────────────────────
+ *
+ * Dustin, 11 Sep 2026: *"Once it spits out a recommended plan and numbers, we
+ * need to put in a way to manually change these numbers and edit this entire
+ * plan before you accept it to make an ongoing plan. Even though this is run by
+ * AI, the client needs the ability to override those numbers and edit this plan
+ * before they actually accept it."* And, minutes later, that it applies to all
+ * three modes: *"Same issue from the build from my targets and build it from
+ * the foods I eat. We need to be able to edit it after it gives us the plan
+ * before we confirm it."*
+ *
+ * The draft screen had said "Adjust the amounts before you save it" since it
+ * was built, and there was nothing to adjust them with. Now there is, and it is
+ * one editor for all three modes because they share this sheet.
+ */
+
+/** Macros scale with the amount. Everything else about the item is left alone. */
+function scaleItemTo(base: DraftItem, amount: number | null): DraftItem {
+  const from = base.amount;
+  // No baseline to scale from — a "to taste" item, or a zero. Take the number
+  // and leave the macros where they are rather than dividing by nothing.
+  if (from == null || from === 0 || amount == null) return { ...base, amount };
+  const r = amount / from;
+  const micros = base.micros
+    ? Object.fromEntries(Object.entries(base.micros).map(([k, v]) => [k, v == null ? null : Math.round(v * r * 1000) / 1000]))
+    : base.micros;
+  return {
+    ...base,
+    amount,
+    p: Math.round(base.p * r * 10) / 10,
+    c: Math.round(base.c * r * 10) / 10,
+    f: Math.round(base.f * r * 10) / 10,
+    kcal: Math.round((base.kcal || kcalOf(base.p, base.c, base.f)) * r),
+    micros,
+  };
+}
+
+/**
+ * Totals and the target check, recomputed from the items after every edit.
+ *
+ * `planTargetDrift` is the SERVER's check, imported rather than reimplemented —
+ * the same 3% on calories and 5g per macro the prompt demands. A second
+ * tolerance invented here is how "within 3%" becomes 24%.
+ */
+function recomputeDraft(d: PlanDraft): PlanDraft {
+  const totals = { kcal: 0, p: 0, c: 0, f: 0 };
+  for (const m of d.meals) {
+    for (const it of m.items) {
+      totals.p += it.p || 0;
+      totals.c += it.c || 0;
+      totals.f += it.f || 0;
+      totals.kcal += it.kcal || kcalOf(it.p || 0, it.c || 0, it.f || 0);
+    }
+  }
+  totals.kcal = Math.round(totals.kcal);
+  totals.p = Math.round(totals.p * 10) / 10;
+  totals.c = Math.round(totals.c * 10) / 10;
+  totals.f = Math.round(totals.f * 10) / 10;
+  const next: PlanDraft = { ...d, totals };
+  const { ok, drift } = planTargetDrift(next as never);
+  if (ok) { const { targetsMet: _t, drift: _d, ...clean } = next; return clean as PlanDraft; }
+  return { ...next, targetsMet: false, drift };
+}
 
 function AiPlanSheet({
   mode, clientId, clientName, saving, onAccept, onClose, onBack,
@@ -3986,7 +4059,74 @@ function AiPlanSheet({
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState<PlanDraft | null>(null);
+  // The item as the model wrote it, by key. Every amount edit scales from HERE,
+  // never from the current value, so repeated typing cannot drift the macros.
+  const [baseItems, setBaseItems] = useState<Record<string, DraftItem>>({});
+  const [edited, setEdited] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  /** Stamp keys on a fresh draft and remember each item as it arrived. */
+  function loadDraft(plan: PlanDraft) {
+    const base: Record<string, DraftItem> = {};
+    const keyed: PlanDraft = {
+      ...plan,
+      meals: plan.meals.map((m, mi) => ({
+        ...m,
+        items: m.items.map((it, ii) => {
+          const _k = `${mi}:${ii}`;
+          const withKey = { ...it, _k };
+          base[_k] = withKey;
+          return withKey;
+        }),
+      })),
+    };
+    setBaseItems(base);
+    setEdited(false);
+    setDraft(recomputeDraft(keyed));
+  }
+
+  /** Replace one item in place, then recompute everything above it. */
+  function patchItem(mi: number, ii: number, next: DraftItem) {
+    setEdited(true);
+    setDraft((d) => d && recomputeDraft({
+      ...d,
+      meals: d.meals.map((m, i) => i !== mi ? m : { ...m, items: m.items.map((it, j) => (j === ii ? next : it)) }),
+    }));
+  }
+
+  function removeItem(mi: number, ii: number) {
+    setEdited(true);
+    setDraft((d) => d && recomputeDraft({
+      ...d,
+      meals: d.meals.map((m, i) => i !== mi ? m : { ...m, items: m.items.filter((_, j) => j !== ii) }),
+    }));
+  }
+
+  function removeMeal(mi: number) {
+    setEdited(true);
+    setDraft((d) => d && recomputeDraft({ ...d, meals: d.meals.filter((_, i) => i !== mi) }));
+  }
+
+  function patchMeal(mi: number, field: "name" | "timing", value: string) {
+    setEdited(true);
+    setDraft((d) => d && ({ ...d, meals: d.meals.map((m, i) => (i === mi ? { ...m, [field]: value } : m)) }));
+  }
+
+  /**
+   * The TARGETS are his to override outright. Typing a macro refills calories
+   * the same 4/4/9 way the entry form does; editing calories directly is left
+   * alone, which is the one field that must stay hand-settable.
+   */
+  function patchTarget(field: "kcal" | "p" | "c" | "f", raw: string) {
+    const v = Number(raw.replace(/[^0-9]/g, "")) || 0;
+    setEdited(true);
+    setDraft((d) => {
+      if (!d) return d;
+      const t = { ...d.targets, [field]: v };
+      if (field !== "kcal") t.kcal = Math.round(kcalOf(t.p, t.c, t.f));
+      return recomputeDraft({ ...d, targets: t });
+    });
+  }
   const label = mode === "targets" ? "AI draft" : mode === "foods" ? "my foods" : "coach consult";
   const inputStyle: React.CSSProperties = { background: "var(--brand-bg)", border: "1px solid var(--brand-border)", color: "var(--brand-text)", borderRadius: 12, padding: "10px 12px", fontSize: 13, width: "100%", outline: "none", textAlign: "center" };
 
@@ -4002,7 +4142,7 @@ function AiPlanSheet({
         setErr(json?.error || "Couldn't draft a plan right now — try again in a moment (this feature is limited per day).");
         return;
       }
-      setDraft(plan as PlanDraft);
+      loadDraft(plan as PlanDraft);
     } catch {
       setErr("Network error — check your connection and try again.");
     } finally { setBusy(false); }
@@ -4139,28 +4279,70 @@ function AiPlanSheet({
               <> — matching the target.</>
             )}
           </div>
+          {/* THE TARGETS ARE HIS TO OVERRIDE. Typing a macro refills calories
+              4/4/9; calories stay hand-settable. */}
+          <p className="text-xs font-bold uppercase tracking-widest mb-1 mt-1" style={{ color: "var(--brand-text-secondary)" }}>Targets — yours to change</p>
+          <div className="grid grid-cols-4 gap-1.5 mb-2">
+            {([["kcal", "KCAL"], ["p", "P"], ["c", "C"], ["f", "F"]] as const).map(([k, lab]) => (
+              <label key={k} className="block">
+                <span className="block text-center" style={{ fontSize: 9, fontWeight: 800, letterSpacing: 0.6, color: "var(--brand-text-secondary)" }}>{lab}</span>
+                <input inputMode="numeric" aria-label={`target ${lab}`} value={String(draft.targets[k])}
+                  onChange={(e) => patchTarget(k, e.target.value)} style={inputStyle} />
+              </label>
+            ))}
+          </div>
+
           {draft.meals.map((dm, i) => {
             const sub = dm.items.reduce((a, it) => ({ k: a.k + (it.kcal || 0), p: a.p + (it.p || 0) }), { k: 0, p: 0 });
             return (
               <div key={i} className="rounded-2xl p-3 mb-1.5" style={{ background: "var(--brand-bg)", border: "1px solid var(--brand-border)" }}>
-                <div className="flex justify-between items-center mb-1">
-                  <p className="text-xs font-bold" style={{ color: "var(--brand-text)" }}>{dm.name}{dm.timing ? <span style={{ color: "var(--brand-text-secondary)", fontWeight: 600 }}> · {dm.timing}</span> : null}</p>
-                  <p className="text-xs font-bold" style={{ color: "var(--brand-text)" }}>{Math.round(sub.k)} cal · {Math.round(sub.p)}P</p>
+                <div className="flex justify-between items-center gap-2 mb-1.5">
+                  <input aria-label={`meal ${i + 1} name`} value={dm.name} onChange={(e) => patchMeal(i, "name", e.target.value)}
+                    className="min-w-0 flex-1"
+                    style={{ ...inputStyle, textAlign: "left", fontWeight: 700, padding: "6px 8px" }} />
+                  <input aria-label={`meal ${i + 1} time`} value={dm.timing ?? ""} placeholder="time"
+                    onChange={(e) => patchMeal(i, "timing", e.target.value)}
+                    style={{ ...inputStyle, width: 84, padding: "6px 8px" }} />
+                  <button type="button" aria-label={`remove meal ${i + 1}`} onClick={() => removeMeal(i)}
+                    style={{ width: 32, height: 32, flexShrink: 0, color: "var(--brand-text-secondary)", background: "transparent", border: 0, fontSize: 15 }}>✕</button>
                 </div>
+                <p className="text-xs font-bold mb-1.5 text-right" style={{ color: "var(--brand-text)" }}>{Math.round(sub.k)} cal · {Math.round(sub.p)}P</p>
                 {dm.items.map((it, j) => (
-                  <div key={j} className="flex justify-between py-0.5 text-xs" style={{ color: "var(--brand-text-secondary)", borderBottom: j < dm.items.length - 1 ? "1px dashed var(--brand-border)" : "none" }}>
-                    <span>{it.food}</span>
-                    <b style={{ color: "var(--brand-text)" }}>{it.amount != null ? `${it.amount}${it.unit ? " " + it.unit : ""}` : it.unit || ""}</b>
+                  <div key={it._k ?? j} className="flex items-center gap-1.5 py-1"
+                    style={{ borderBottom: j < dm.items.length - 1 ? "1px dashed var(--brand-border)" : "none" }}>
+                    <input aria-label={`item ${j + 1} food`} value={it.food}
+                      onChange={(e) => patchItem(i, j, { ...it, food: e.target.value })}
+                      className="min-w-0 flex-1"
+                      style={{ ...inputStyle, textAlign: "left", fontSize: 12, padding: "6px 8px" }} />
+                    {/* CHANGING AN AMOUNT SCALES THE MACROS, from the item as
+                        the model wrote it — see scaleItemTo. Nothing here ever
+                        edits a macro directly: a portion a person can picture is
+                        the honest handle, and the grams follow it. */}
+                    <input inputMode="decimal" aria-label={`item ${j + 1} amount`}
+                      value={it.amount == null ? "" : String(it.amount)}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/[^0-9.]/g, "");
+                        const n = raw === "" ? null : Number(raw);
+                        const base = (it._k && baseItems[it._k]) || it;
+                        patchItem(i, j, { ...scaleItemTo(base, Number.isFinite(n as number) ? n : null), food: it.food, unit: it.unit, _k: it._k });
+                      }}
+                      style={{ ...inputStyle, width: 64, fontSize: 12, padding: "6px 6px" }} />
+                    <span style={{ fontSize: 11, color: "var(--brand-text-secondary)", width: 40, flexShrink: 0 }}>{it.unit || ""}</span>
+                    <span style={{ fontSize: 10, color: "var(--brand-text-secondary)", width: 54, flexShrink: 0, textAlign: "right" }}>{Math.round(it.kcal || 0)} cal</span>
+                    <button type="button" aria-label={`remove item ${j + 1}`} onClick={() => removeItem(i, j)}
+                      style={{ width: 28, height: 28, flexShrink: 0, color: "var(--brand-text-secondary)", background: "transparent", border: 0, fontSize: 13 }}>✕</button>
                   </div>
                 ))}
               </div>
             );
           })}
           <div className="flex justify-between py-2 text-sm font-bold" style={{ color: "var(--brand-text)" }}>
-            <span style={{ color: "var(--brand-text-secondary)", fontWeight: 500 }}>Draft total</span>
+            <span style={{ color: "var(--brand-text-secondary)", fontWeight: 500 }}>Draft total{edited ? " (edited)" : ""}</span>
             <span>{Math.round(draft.totals.kcal)} cal · {Math.round(draft.totals.p)}P / {Math.round(draft.totals.c)}C / {Math.round(draft.totals.f)}F</span>
           </div>
-          <p className="text-xs mb-2" style={{ color: "var(--brand-text-secondary)" }}>Every meal stays editable after accepting — swap, adjust amounts, reorder, all of it.</p>
+          <p className="text-xs mb-2" style={{ color: "var(--brand-text-secondary)" }}>
+            Change anything above — the totals and the target check follow as you type. Accepting saves exactly what you see, and every meal stays editable afterwards too.
+          </p>
           <button onClick={() => onAccept(draft, label)} disabled={saving}
             className="w-full py-3 rounded-2xl text-sm font-bold text-white" style={{ background: "var(--brand-primary)" }}>
             {saving ? "Creating your plan…" : `Accept — make it my ongoing plan ✓ (${clientName.split(" ")[0]})`}
