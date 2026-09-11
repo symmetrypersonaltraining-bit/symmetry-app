@@ -144,7 +144,7 @@ test("typing macros fills in the calories", () => {
   assert.match(ui, /<TargetEditor value=\{tgIn\} onChange=\{setTgIn\} \/>/, "the entry form uses the shared control");
   assert.doesNotMatch(ui, /setTgIn\(\{ \.\.\.tgIn, \[k\]: e\.target\.value/, "never straight to state — calories would not follow");
   const editor = readFileSync(join(ROOT, "src/components/nutrition/TargetEditor.tsx"), "utf8");
-  assert.match(editor, /setGrams\(value, k, n\)/, "a gram edit goes through the shared rule");
+  assert.match(editor, /setGrams\(from, k, n\)/, "a gram edit goes through the shared rule, from the focus baseline");
   // And the rule itself: grams in, calories out, 4/4/9.
   assert.equal(fromGrams(180, 230, 55).kcal, 180 * 4 + 230 * 4 + 55 * 9);
 });
@@ -155,7 +155,7 @@ test("the calories field can still be typed into directly", () => {
   // rescaled at the same split, rather than being left to disagree with it.
   const editor = readFileSync(join(ROOT, "src/components/nutrition/TargetEditor.tsx"), "utf8");
   assert.match(editor, /aria-label="target calories"/, "the calories box is still there to type in");
-  assert.match(editor, /setKcal\(value, n\)/, "and typing in it rescales the grams");
+  assert.match(editor, /setKcal\(value, n, from\)/, "and typing in it rescales the grams from the focus baseline, not the last keystroke");
   const cut = setKcal(fromGrams(180, 230, 55), 1800);
   assert.ok(Math.abs(cut.kcal - 1800) <= 4, `asked 1800, landed ${cut.kcal}`);
   assert.ok(cut.p < 180 && cut.c < 230 && cut.f < 55, "every macro came down with it");

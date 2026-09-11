@@ -71,14 +71,29 @@ export function setGrams(t: MacroTargets, field: MacroKey, grams: number): Macro
  * carbs". Protein-first would be a different, defensible choice — and it is
  * not the one he described.
  */
-export function setKcal(t: MacroTargets, kcal: number): MacroTargets {
+export function setKcal(t: MacroTargets, kcal: number, from: MacroTargets = t): MacroTargets {
   const want = Math.max(0, Math.round(kcal));
-  const current = kcalOf(t.p, t.c, t.f);
+  // ── ALWAYS RESCALE FROM `from`, NEVER FROM THE LAST KEYSTROKE ────────────
+  //
+  // Dustin, 11 Sep: *"If I change the calories, it immediately zeros out all
+  // of the protein, carbs, and fat."* He was right and this was the bug.
+  //
+  // Typing 2000 into a 2,135 kcal target sends FOUR values through here — 2,
+  // 20, 200, 2000. The first scales every macro by 2/2135, which rounds all
+  // three to zero; from then on there is no split left to keep and every
+  // later keystroke just sets a calorie number onto three zeros.
+  //
+  // `from` is the target as it stood when the field was focused, so the split
+  // being kept is always a real one. It is the same rule the draft's item
+  // amounts already used — scale from the original, never compound — and not
+  // applying it here too was the oversight.
+  const base = from;
+  const current = kcalOf(base.p, base.c, base.f);
   // Nothing to keep the shape of. A bare calorie number with no macros is not
   // a target, so leave the grams alone rather than inventing a split.
   if (current <= 0 || want <= 0) return { ...t, kcal: want };
   const r = want / current;
-  return fromGrams(t.p * r, t.c * r, t.f * r);
+  return fromGrams(base.p * r, base.c * r, base.f * r);
 }
 
 /**
