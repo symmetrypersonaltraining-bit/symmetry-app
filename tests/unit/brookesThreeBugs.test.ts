@@ -6,6 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { fromGrams, setKcal } from "../../src/lib/nutrition/macroSplit";
 import { join } from "node:path";
 import {
   validatePlanOnTarget,
@@ -133,20 +134,29 @@ test("the draft screen prints what the plan actually comes to", () => {
 // ---------------------------------------------------------------------------
 
 test("typing macros fills in the calories", () => {
+  // Brooke Orton, 23 Aug: "Would be cool if when you're putting in macros it
+  // auto calculated calories." Still true, and now more so — on 11 Sep 2026
+  // the four bare inputs became TargetEditor, where grams, calories AND
+  // percentages all follow each other. Dustin: "we need to be able to change
+  // the macros and the calories, and they all need to follow each other."
+  // The arithmetic moved to macroSplit.ts; this asserts the screen uses it.
   const ui = readFileSync(join(ROOT, "src/app/(app)/nutrition/v3/NutritionV3Client.tsx"), "utf8");
-  assert.match(ui, /function setTarget\(/, "the target inputs no longer share a handler");
-  assert.match(ui, /kcalOf\(Number\(next\.p\)/, "calories are not derived from the macros");
-  assert.ok(
-    !/setTgIn\(\{ \.\.\.tgIn, \[k\]: e\.target\.value/.test(ui),
-    "a target input still writes straight to state, so calories will not follow",
-  );
+  assert.match(ui, /<TargetEditor value=\{tgIn\} onChange=\{setTgIn\} \/>/, "the entry form uses the shared control");
+  assert.doesNotMatch(ui, /setTgIn\(\{ \.\.\.tgIn, \[k\]: e\.target\.value/, "never straight to state — calories would not follow");
+  const editor = readFileSync(join(ROOT, "src/components/nutrition/TargetEditor.tsx"), "utf8");
+  assert.match(editor, /setGrams\(value, k, n\)/, "a gram edit goes through the shared rule");
+  // And the rule itself: grams in, calories out, 4/4/9.
+  assert.equal(fromGrams(180, 230, 55).kcal, 180 * 4 + 230 * 4 + 55 * 9);
 });
 
 test("the calories field can still be typed into directly", () => {
   // Deriving it is a convenience, not a lock. Someone working to a prescribed
-  // calorie number needs to set it and let the macros be checked against it.
-  const ui = readFileSync(join(ROOT, "src/app/(app)/nutrition/v3/NutritionV3Client.tsx"), "utf8");
-  const idx = ui.indexOf("function setTarget(");
-  const body = ui.slice(idx, idx + 700);
-  assert.match(body, /if \(field === "kcal"\) return next;/, "editing calories directly is being overwritten");
+  // calorie number needs to set it — and since 11 Sep the macros FOLLOW it,
+  // rescaled at the same split, rather than being left to disagree with it.
+  const editor = readFileSync(join(ROOT, "src/components/nutrition/TargetEditor.tsx"), "utf8");
+  assert.match(editor, /aria-label="target calories"/, "the calories box is still there to type in");
+  assert.match(editor, /setKcal\(value, n\)/, "and typing in it rescales the grams");
+  const cut = setKcal(fromGrams(180, 230, 55), 1800);
+  assert.ok(Math.abs(cut.kcal - 1800) <= 4, `asked 1800, landed ${cut.kcal}`);
+  assert.ok(cut.p < 180 && cut.c < 230 && cut.f < 55, "every macro came down with it");
 });
