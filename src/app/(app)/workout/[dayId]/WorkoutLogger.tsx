@@ -1537,10 +1537,35 @@ export default function WorkoutLogger({
       setWorkoutLogId(found.id);
       return { id: found.id, alreadyCompleted: !!found.completed };
     }
-    const { data, error } = await supabase.from("workout_logs").insert({
+    const insertLog = () => supabase.from("workout_logs").insert({
       client_id: clientId, day_id: day.id, log_date: sessionDate,
       started_at: new Date().toISOString(), completed: false,
     }).select("id").single();
+    let { data, error } = await insertLog();
+    // 42501 = "new row violates row-level security policy for table
+    // workout_logs". Dustin, 11 Sep, exercise 11 of 17 on Bulk — Legs, with a
+    // log that had existed since 10:43 and carried 24 sets.
+    //
+    // The lookup above had just come back EMPTY for a log that was there. Only
+    // one caller sees that: one with no login attached. RLS hides the row from
+    // an anonymous request, so "no log" was the answer, and the insert that
+    // followed was refused for the same reason. His next tap carried the
+    // session and saved. So this is a request that went out before the
+    // browser client had its session in hand, not a policy that is wrong.
+    //
+    // Ask the client for its session — that is what makes it read the cookie
+    // and refresh if it must — and try ONCE more. Not the lookup: a second
+    // insert against an existing open log is refused by
+    // workout_logs_one_open_per_day, and the 23505 branch below already reads
+    // the winner back. One retry, then it is reported like any other failure.
+    let retried = false;
+    if (error && (error as { code?: string }).code === "42501") {
+      const { data: sess } = await supabase.auth.getSession();
+      if (sess?.session) {
+        retried = true;
+        ({ data, error } = await insertLog());
+      }
+    }
     // 23505 = the partial unique index workout_logs_one_open_per_day refused a
     // SECOND open log for this client, day and date.
     //
@@ -1566,7 +1591,17 @@ export default function WorkoutLogger({
           return { id: won.id, alreadyCompleted: false };
         }
       }
+      // set_logs has reported its refusals since 26 Aug; this insert never
+      // did, which is why 11 Sep left no row to diagnose from. Same route,
+      // its own scope, and whether a session was present when it failed.
+      void logClientError({
+        clientId, scope: "workout_log", error,
+        detail: { day_id: day.id, log_date: sessionDate, retried_after_session: retried },
+      });
       throw error;
+    }
+    if (!data) {
+      throw new Error("Couldn't start your workout just now — nothing has been lost. Tap again.");
     }
     setWorkoutLogId(data.id);
     return { id: data.id, alreadyCompleted: false };
@@ -1712,6 +1747,10 @@ export default function WorkoutLogger({
         });
         throw new Error("That set didn't save. Your other sets are safe — tap it again.");
       }
+      // A set that saved clears whatever the last failed one left on screen.
+      // The banner is completeError, and until now only Complete cleared it:
+      // "when this happens error doesnt clear once it works" (Dustin, 11 Sep).
+      setCompleteError(null);
       updateSet(peId, si, "done", true);
       if (navigator.vibrate) navigator.vibrate(50);
       // NO REST TIMER HERE. Logging a set does not open anything.
