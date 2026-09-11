@@ -2812,11 +2812,18 @@ option:hover {
 [data-theme="deepreef"]:not([data-appearance="light"]) .sym-page {
   --sink: 32%;
   --tile-deep: 13%;
-  /* The dark half of the same fix. A 3% lift takes the weakest dark scheme
-     (Midnight, 1.213) to 1.322 and leaves Carbon Neon — already the clearest at
-     1.474 — around 1.6, which suits a neon palette. Every scheme in the app now
-     clears 1.28, light and dark alike. */
-  --tile-lift: 3%;
+  /* The dark half of the same fix, and it has to hold for BOTH ways a scheme
+     can be dark: the seven that are dark by design, and any of the other
+     twenty-three when the Light/Dark toggle is set to Dark.
+
+     3% covered the first and not the second. Charcoal, Deep Purple and Rose
+     all have near-black primaries, so the surfaces derived from them collapse
+     toward the page and the gap went back under 1.28 (1.244 / 1.249 / 1.277)
+     the moment one of them was shown dark. 5% is the value where the worst
+     case in the whole matrix — thirty schemes times both appearances — is
+     1.292, which is the same number the worst LIGHT scheme sits at. One
+     relationship, everywhere, whichever way round it is. */
+  --tile-lift: 5%;
   --tile-edge: color-mix(in srgb, #FFFFFF 9%, transparent);
   --tile-shadow: 0 14px 30px -10px rgba(0, 0, 0, .62), 0 2px 6px rgba(0, 0, 0, .45);
   --tile-cap: linear-gradient(100deg,

@@ -1462,6 +1462,54 @@ button:disabled:active { transform: none; }
 /* Native controls (date pickers, scrollbars) follow too */
 [data-appearance="dark"] { color-scheme: dark; }
 
+/* ── Forced LIGHT mode on a dark scheme (2026-09-11) ───────────────────────
+   The mirror of the block above, and the other half of the Light / Dark / Auto
+   toggle in Settings.
+
+   Dustin, 11 Sep 2026: *"There should be a light mode and a dark mode toggle"*
+   — for every scheme, not just the light ones. Twenty-two of the thirty were
+   already covered: they are light, and [data-appearance="dark"] darkens them.
+   The other eight (Midnight, Carbon Neon, the four Midnight * and Deep Reef)
+   are dark BY DESIGN and had no way back.
+
+   Same technique as the dark block, pointed the other way: surfaces are
+   derived from the scheme's own --brand-primary, so Midnight stays blue and
+   Carbon Neon stays teal instead of all eight collapsing into the same white.
+   --brand-accent is deliberately untouched, exactly as the dark block leaves
+   it, because a token cannot be redefined from itself.
+
+   AutoDark only sets appearance="light" when the theme MEASURES dark, the same
+   luminance test that guards the dark override. That matters: applied to a
+   light scheme this block would overwrite twenty-two hand-picked palettes with
+   one generic derivation. Choosing Light on an already-light scheme therefore
+   sets no attribute at all — the scheme is already what was asked for.
+
+   Every rule keyed off a dark scheme by NAME carries
+   :not([data-appearance="light"]) so it stands down here and the light
+   defaults underneath it apply — including .sym-page's page/tile separation,
+   which is the light-side 12% sink rather than the dark side's 32%.
+   Revert = delete this block and the :not()s. */
+[data-appearance="light"] {
+  --brand-bg:      color-mix(in srgb, var(--brand-primary) 6%, #F7F9FC);
+  --brand-surface: color-mix(in srgb, var(--brand-primary) 2%, #FFFFFF);
+  --brand-card:    color-mix(in srgb, var(--brand-primary) 5%, #FFFFFF);
+  --brand-border:  color-mix(in srgb, var(--brand-primary) 18%, #DCE3ED);
+  /* Only a touch of the scheme in the ink — enough that Midnight's text reads
+     faintly blue and Deep Reef's faintly teal, not enough to cost contrast. */
+  --brand-text:           color-mix(in srgb, var(--brand-primary) 10%, #171B22);
+  --brand-text-secondary: color-mix(in srgb, var(--brand-primary) 14%, #5A6472);
+  --brand-sidebar: color-mix(in srgb, var(--brand-primary) 9%, #EEF2F8);
+
+  /* Elevation reads as shadow again, not as lift */
+  --brand-elev-1: var(--brand-surface);
+  --brand-elev-2: var(--brand-surface);
+  --brand-elev-3: var(--brand-surface);
+  --shadow-1: 0 1px 2px rgba(20,30,55,.10);
+  --shadow-2: 0 4px 12px rgba(20,30,55,.12);
+  --shadow-3: 0 14px 34px rgba(20,30,55,.16);
+}
+[data-appearance="light"] { color-scheme: light; }
+
 /* ════════════════════════════════════════════════════════════════════════════
    VISUAL LAYER 2 — 2026-07-25
    Additive only, appended last so it wins on equal specificity without editing
@@ -2096,13 +2144,13 @@ option:hover {
     0 0 0 1px color-mix(in srgb, var(--brand-primary) 14%, transparent);
 }
 [data-deep="20"][data-appearance="dark"] body,
-[data-deep="20"][data-theme="midnight"] body,
-[data-deep="20"][data-theme="carbonneon"] body,
-[data-deep="20"][data-theme="midnightaurora"] body,
-[data-deep="20"][data-theme="midnightember"] body,
-[data-deep="20"][data-theme="midnightcitrus"] body,
-[data-deep="20"][data-theme="midnightorchid"] body,
-[data-deep="20"][data-theme="deepreef"] body {
+[data-deep="20"][data-theme="midnight"]:not([data-appearance="light"]) body,
+[data-deep="20"][data-theme="carbonneon"]:not([data-appearance="light"]) body,
+[data-deep="20"][data-theme="midnightaurora"]:not([data-appearance="light"]) body,
+[data-deep="20"][data-theme="midnightember"]:not([data-appearance="light"]) body,
+[data-deep="20"][data-theme="midnightcitrus"]:not([data-appearance="light"]) body,
+[data-deep="20"][data-theme="midnightorchid"]:not([data-appearance="light"]) body,
+[data-deep="20"][data-theme="deepreef"]:not([data-appearance="light"]) body {
   --block-glow:
     0 12px 28px -10px color-mix(in srgb,
       color-mix(in srgb, var(--brand-accent) 62%, #000) 52%, transparent),
@@ -2115,13 +2163,13 @@ option:hover {
    white so the edge still reads. Light schemes keep the true colours, where
    lifting them would wash the strip out instead. */
 [data-deep="20"][data-appearance="dark"] body,
-[data-deep="20"][data-theme="midnight"] body,
-[data-deep="20"][data-theme="carbonneon"] body,
-[data-deep="20"][data-theme="midnightaurora"] body,
-[data-deep="20"][data-theme="midnightember"] body,
-[data-deep="20"][data-theme="midnightcitrus"] body,
-[data-deep="20"][data-theme="midnightorchid"] body,
-[data-deep="20"][data-theme="deepreef"] body {
+[data-deep="20"][data-theme="midnight"]:not([data-appearance="light"]) body,
+[data-deep="20"][data-theme="carbonneon"]:not([data-appearance="light"]) body,
+[data-deep="20"][data-theme="midnightaurora"]:not([data-appearance="light"]) body,
+[data-deep="20"][data-theme="midnightember"]:not([data-appearance="light"]) body,
+[data-deep="20"][data-theme="midnightcitrus"]:not([data-appearance="light"]) body,
+[data-deep="20"][data-theme="midnightorchid"]:not([data-appearance="light"]) body,
+[data-deep="20"][data-theme="deepreef"]:not([data-appearance="light"]) body {
   --card-topbar: linear-gradient(90deg,
     color-mix(in srgb, var(--brand-primary) 55%, white) 0%,
     color-mix(in srgb, var(--brand-accent) 72%, white) 58%,
@@ -2239,13 +2287,13 @@ option:hover {
     0 0 0 1px color-mix(in srgb, var(--brand-primary) 22%, transparent);
 }
 [data-deep="35"][data-appearance="dark"] body,
-[data-deep="35"][data-theme="midnight"] body,
-[data-deep="35"][data-theme="carbonneon"] body,
-[data-deep="35"][data-theme="midnightaurora"] body,
-[data-deep="35"][data-theme="midnightember"] body,
-[data-deep="35"][data-theme="midnightcitrus"] body,
-[data-deep="35"][data-theme="midnightorchid"] body,
-[data-deep="35"][data-theme="deepreef"] body {
+[data-deep="35"][data-theme="midnight"]:not([data-appearance="light"]) body,
+[data-deep="35"][data-theme="carbonneon"]:not([data-appearance="light"]) body,
+[data-deep="35"][data-theme="midnightaurora"]:not([data-appearance="light"]) body,
+[data-deep="35"][data-theme="midnightember"]:not([data-appearance="light"]) body,
+[data-deep="35"][data-theme="midnightcitrus"]:not([data-appearance="light"]) body,
+[data-deep="35"][data-theme="midnightorchid"]:not([data-appearance="light"]) body,
+[data-deep="35"][data-theme="deepreef"]:not([data-appearance="light"]) body {
   --block-glow:
     0 12px 28px -10px color-mix(in srgb,
       color-mix(in srgb, var(--brand-accent) 62%, #000) 68%, transparent),
@@ -2258,13 +2306,13 @@ option:hover {
    white so the edge still reads. Light schemes keep the true colours, where
    lifting them would wash the strip out instead. */
 [data-deep="35"][data-appearance="dark"] body,
-[data-deep="35"][data-theme="midnight"] body,
-[data-deep="35"][data-theme="carbonneon"] body,
-[data-deep="35"][data-theme="midnightaurora"] body,
-[data-deep="35"][data-theme="midnightember"] body,
-[data-deep="35"][data-theme="midnightcitrus"] body,
-[data-deep="35"][data-theme="midnightorchid"] body,
-[data-deep="35"][data-theme="deepreef"] body {
+[data-deep="35"][data-theme="midnight"]:not([data-appearance="light"]) body,
+[data-deep="35"][data-theme="carbonneon"]:not([data-appearance="light"]) body,
+[data-deep="35"][data-theme="midnightaurora"]:not([data-appearance="light"]) body,
+[data-deep="35"][data-theme="midnightember"]:not([data-appearance="light"]) body,
+[data-deep="35"][data-theme="midnightcitrus"]:not([data-appearance="light"]) body,
+[data-deep="35"][data-theme="midnightorchid"]:not([data-appearance="light"]) body,
+[data-deep="35"][data-theme="deepreef"]:not([data-appearance="light"]) body {
   --card-topbar: linear-gradient(90deg,
     color-mix(in srgb, var(--brand-primary) 55%, white) 0%,
     color-mix(in srgb, var(--brand-accent) 72%, white) 58%,
@@ -2382,13 +2430,13 @@ option:hover {
     0 0 0 1px color-mix(in srgb, var(--brand-primary) 32%, transparent);
 }
 [data-deep="50"][data-appearance="dark"] body,
-[data-deep="50"][data-theme="midnight"] body,
-[data-deep="50"][data-theme="carbonneon"] body,
-[data-deep="50"][data-theme="midnightaurora"] body,
-[data-deep="50"][data-theme="midnightember"] body,
-[data-deep="50"][data-theme="midnightcitrus"] body,
-[data-deep="50"][data-theme="midnightorchid"] body,
-[data-deep="50"][data-theme="deepreef"] body {
+[data-deep="50"][data-theme="midnight"]:not([data-appearance="light"]) body,
+[data-deep="50"][data-theme="carbonneon"]:not([data-appearance="light"]) body,
+[data-deep="50"][data-theme="midnightaurora"]:not([data-appearance="light"]) body,
+[data-deep="50"][data-theme="midnightember"]:not([data-appearance="light"]) body,
+[data-deep="50"][data-theme="midnightcitrus"]:not([data-appearance="light"]) body,
+[data-deep="50"][data-theme="midnightorchid"]:not([data-appearance="light"]) body,
+[data-deep="50"][data-theme="deepreef"]:not([data-appearance="light"]) body {
   --block-glow:
     0 12px 28px -10px color-mix(in srgb,
       color-mix(in srgb, var(--brand-accent) 62%, #000) 85%, transparent),
@@ -2401,13 +2449,13 @@ option:hover {
    white so the edge still reads. Light schemes keep the true colours, where
    lifting them would wash the strip out instead. */
 [data-deep="50"][data-appearance="dark"] body,
-[data-deep="50"][data-theme="midnight"] body,
-[data-deep="50"][data-theme="carbonneon"] body,
-[data-deep="50"][data-theme="midnightaurora"] body,
-[data-deep="50"][data-theme="midnightember"] body,
-[data-deep="50"][data-theme="midnightcitrus"] body,
-[data-deep="50"][data-theme="midnightorchid"] body,
-[data-deep="50"][data-theme="deepreef"] body {
+[data-deep="50"][data-theme="midnight"]:not([data-appearance="light"]) body,
+[data-deep="50"][data-theme="carbonneon"]:not([data-appearance="light"]) body,
+[data-deep="50"][data-theme="midnightaurora"]:not([data-appearance="light"]) body,
+[data-deep="50"][data-theme="midnightember"]:not([data-appearance="light"]) body,
+[data-deep="50"][data-theme="midnightcitrus"]:not([data-appearance="light"]) body,
+[data-deep="50"][data-theme="midnightorchid"]:not([data-appearance="light"]) body,
+[data-deep="50"][data-theme="deepreef"]:not([data-appearance="light"]) body {
   --card-topbar: linear-gradient(90deg,
     color-mix(in srgb, var(--brand-primary) 55%, white) 0%,
     color-mix(in srgb, var(--brand-accent) 72%, white) 58%,
@@ -2586,20 +2634,20 @@ option:hover {
 }
 [data-appearance="dark"] [style*="color: var(--brand-primary)"],
 [data-appearance="dark"] [style*="color:var(--brand-primary)"],
-[data-theme="midnight"] [style*="color: var(--brand-primary)"],
-[data-theme="midnight"] [style*="color:var(--brand-primary)"],
-[data-theme="carbonneon"] [style*="color: var(--brand-primary)"],
-[data-theme="carbonneon"] [style*="color:var(--brand-primary)"],
-[data-theme="midnightaurora"] [style*="color: var(--brand-primary)"],
-[data-theme="midnightaurora"] [style*="color:var(--brand-primary)"],
-[data-theme="midnightember"] [style*="color: var(--brand-primary)"],
-[data-theme="midnightember"] [style*="color:var(--brand-primary)"],
-[data-theme="midnightcitrus"] [style*="color: var(--brand-primary)"],
-[data-theme="midnightcitrus"] [style*="color:var(--brand-primary)"],
-[data-theme="midnightorchid"] [style*="color: var(--brand-primary)"],
-[data-theme="midnightorchid"] [style*="color:var(--brand-primary)"],
-[data-theme="deepreef"] [style*="color: var(--brand-primary)"],
-[data-theme="deepreef"] [style*="color:var(--brand-primary)"] {
+[data-theme="midnight"]:not([data-appearance="light"]) [style*="color: var(--brand-primary)"],
+[data-theme="midnight"]:not([data-appearance="light"]) [style*="color:var(--brand-primary)"],
+[data-theme="carbonneon"]:not([data-appearance="light"]) [style*="color: var(--brand-primary)"],
+[data-theme="carbonneon"]:not([data-appearance="light"]) [style*="color:var(--brand-primary)"],
+[data-theme="midnightaurora"]:not([data-appearance="light"]) [style*="color: var(--brand-primary)"],
+[data-theme="midnightaurora"]:not([data-appearance="light"]) [style*="color:var(--brand-primary)"],
+[data-theme="midnightember"]:not([data-appearance="light"]) [style*="color: var(--brand-primary)"],
+[data-theme="midnightember"]:not([data-appearance="light"]) [style*="color:var(--brand-primary)"],
+[data-theme="midnightcitrus"]:not([data-appearance="light"]) [style*="color: var(--brand-primary)"],
+[data-theme="midnightcitrus"]:not([data-appearance="light"]) [style*="color:var(--brand-primary)"],
+[data-theme="midnightorchid"]:not([data-appearance="light"]) [style*="color: var(--brand-primary)"],
+[data-theme="midnightorchid"]:not([data-appearance="light"]) [style*="color:var(--brand-primary)"],
+[data-theme="deepreef"]:not([data-appearance="light"]) [style*="color: var(--brand-primary)"],
+[data-theme="deepreef"]:not([data-appearance="light"]) [style*="color:var(--brand-primary)"] {
   color: color-mix(in srgb, var(--brand-primary) 42%, white) !important;
 }
 
@@ -2712,12 +2760,34 @@ option:hover {
      The amounts are split light/dark below: mixing near-black 30% into a light
      page turns it grey, while the same 30% on a dark page is exactly what makes
      a tile read as a slab sitting on top of it. */
-  --sink: 6%;
+  /* THE TILE HAS TO STAND OFF THE PAGE IN ALL THIRTY SCHEMES.
+     Dustin, 11 Sep 2026: *"the background is the same color as the tiles on a
+     lot of the color schemes, and it makes everything kinda merge together…
+     some of them are a little bit different shade, but it's not drastic enough
+     to really make the tile stand out."*
+
+     Measured before changing anything: 16 of the 30 schemes sat under a 1.18
+     contrast ratio between page and tile, Citrus worst at 1.130. The cause is
+     structural rather than per-scheme — the page came from --brand-bg and the
+     tile from --brand-surface, two INDEPENDENT tokens, so the gap between them
+     was whatever each palette happened to have. Nobody chose 1.13; it fell out.
+
+     6% → 12% puts every light scheme between 1.285 and 1.415, a spread of
+     0.010 — the same relationship everywhere, each keeping its own hue, which
+     is what he asked for ("I'd like them all to be the same on each color
+     scheme"). It is a deeper shade of the scheme's own background, not a
+     neutral grey and not white. */
+  --sink: 12%;
   --tile-deep: 4%;
+  /* Dark schemes cannot solve it this way: their pages are already within a few
+     points of black, so sinking further moves nothing. There the TILE lifts
+     instead — see the dark block below. */
+  --tile-lift: 0%;
   --tile-edge: color-mix(in srgb, #FFFFFF 70%, transparent);
   --tile-shadow: 0 12px 28px -8px rgba(20, 30, 55, .20), 0 2px 6px rgba(20, 30, 55, .10);
 
-  --tile-bg: color-mix(in srgb, var(--brand-primary) var(--tile-deep), var(--brand-surface));
+  --tile-bg: color-mix(in srgb, #FFFFFF var(--tile-lift),
+    color-mix(in srgb, var(--brand-primary) var(--tile-deep), var(--brand-surface)));
   /* Everything a tile contains derives from the TILE, not from the raw token,
      so the inside stays separable however far the outside has deepened. */
   --in-tile: color-mix(in srgb, var(--brand-text) 7%, var(--tile-bg));
@@ -2740,15 +2810,27 @@ option:hover {
 }
 
 [data-appearance="dark"] .sym-page,
-[data-theme="midnight"] .sym-page,
-[data-theme="carbonneon"] .sym-page,
-[data-theme="midnightaurora"] .sym-page,
-[data-theme="midnightember"] .sym-page,
-[data-theme="midnightcitrus"] .sym-page,
-[data-theme="midnightorchid"] .sym-page,
-[data-theme="deepreef"] .sym-page {
+[data-theme="midnight"]:not([data-appearance="light"]) .sym-page,
+[data-theme="carbonneon"]:not([data-appearance="light"]) .sym-page,
+[data-theme="midnightaurora"]:not([data-appearance="light"]) .sym-page,
+[data-theme="midnightember"]:not([data-appearance="light"]) .sym-page,
+[data-theme="midnightcitrus"]:not([data-appearance="light"]) .sym-page,
+[data-theme="midnightorchid"]:not([data-appearance="light"]) .sym-page,
+[data-theme="deepreef"]:not([data-appearance="light"]) .sym-page {
   --sink: 32%;
   --tile-deep: 13%;
+  /* The dark half of the same fix, and it has to hold for BOTH ways a scheme
+     can be dark: the seven that are dark by design, and any of the other
+     twenty-three when the Light/Dark toggle is set to Dark.
+
+     3% covered the first and not the second. Charcoal, Deep Purple and Rose
+     all have near-black primaries, so the surfaces derived from them collapse
+     toward the page and the gap went back under 1.28 (1.244 / 1.249 / 1.277)
+     the moment one of them was shown dark. 5% is the value where the worst
+     case in the whole matrix — thirty schemes times both appearances — is
+     1.292, which is the same number the worst LIGHT scheme sits at. One
+     relationship, everywhere, whichever way round it is. */
+  --tile-lift: 5%;
   --tile-edge: color-mix(in srgb, #FFFFFF 9%, transparent);
   --tile-shadow: 0 14px 30px -10px rgba(0, 0, 0, .62), 0 2px 6px rgba(0, 0, 0, .45);
   --tile-cap: linear-gradient(100deg,
@@ -2789,13 +2871,13 @@ option:hover {
    stepping THAT is what makes six visible shades on all thirty schemes. */
 .sym-page { --tile-ladder: color-mix(in srgb, var(--brand-primary) 58%, #0A0E16); }
 [data-appearance="dark"] .sym-page,
-[data-theme="midnight"] .sym-page,
-[data-theme="carbonneon"] .sym-page,
-[data-theme="midnightaurora"] .sym-page,
-[data-theme="midnightember"] .sym-page,
-[data-theme="midnightcitrus"] .sym-page,
-[data-theme="midnightorchid"] .sym-page,
-[data-theme="deepreef"] .sym-page { --tile-ladder: color-mix(in srgb, var(--brand-primary) 58%, #FFFFFF); }
+[data-theme="midnight"]:not([data-appearance="light"]) .sym-page,
+[data-theme="carbonneon"]:not([data-appearance="light"]) .sym-page,
+[data-theme="midnightaurora"]:not([data-appearance="light"]) .sym-page,
+[data-theme="midnightember"]:not([data-appearance="light"]) .sym-page,
+[data-theme="midnightcitrus"]:not([data-appearance="light"]) .sym-page,
+[data-theme="midnightorchid"]:not([data-appearance="light"]) .sym-page,
+[data-theme="deepreef"]:not([data-appearance="light"]) .sym-page { --tile-ladder: color-mix(in srgb, var(--brand-primary) 58%, #FFFFFF); }
 .sym-tile[data-rung] { background: color-mix(in srgb, var(--tile-ladder) var(--rung), var(--tile-bg)); }
 
 .sym-tile-head {
@@ -3150,6 +3232,39 @@ option:hover {
 }
 .sym-tile.is-today .sym-ring { border-color: rgba(255, 255, 255, .6); }
 
+/* AN UNLOGGED RING HAS TO LOOK LIKE SOMETHING YOU TAP.
+   Dustin, 10 Sep, with a screenshot of M5 and M6: "you cant see the unchecked
+   circles on unlocked foods w the new layout on nutrition logger."
+
+   He was right, and the cause was a token drawn against the wrong background —
+   the component passed --brand-border inline, which is mixed against the PAGE,
+   over a ring that sits inside a TILE. In dark those two are near-identical
+   darks. That is fixed in the component by not overriding the class at all.
+
+   This rule is the other half. Every OTHER state of this control is a filled
+   circle in a state colour — green logged, gold part, blue off-plan — so the
+   one state a client is meant to act on was also the only one with no fill at
+   all. It gets a real border and a faint inset, which is what makes an empty
+   checkbox read as an empty checkbox rather than as a hairline.
+
+   Both values are mixed against --tile-bg for the same reason the bug existed:
+   inside a tile, nothing may be mixed against the page. */
+.sym-ring--todo {
+  border-color: color-mix(in srgb, var(--brand-text) 38%, var(--tile-bg));
+  background: color-mix(in srgb, var(--brand-text) 5%, var(--tile-bg));
+  /* The ghost tick inherits this. A shade stronger than the border because a
+     3px stroke reads lighter than a solid ring edge at the same value — they
+     are meant to look like one object, not two weights. It cannot be mistaken
+     for a logged meal: that is a WHITE tick on a solid green fill, and this is
+     an outline on an empty circle. */
+  color: color-mix(in srgb, var(--brand-text) 45%, var(--tile-bg));
+}
+.sym-ring--todo:active { background: color-mix(in srgb, var(--brand-text) 12%, var(--tile-bg)); }
+/* On the bright tile the white border above already carries it; the inset would
+   only muddy a fill that is already light, and the ghost tick follows the
+   border rather than the tile it is no longer sitting on. */
+.sym-tile.is-today .sym-ring--todo { background: transparent; color: rgba(255, 255, 255, .6); }
+
 /* The food a meal is made of, one item per line — it has always listed every
    item, and it is NOT .sym-wo-name. That class is clamped to two rows because
    "no more than 2 rows of text per card" is about the workout NAME. */
@@ -3272,6 +3387,11 @@ body.mk {
 .mk-decide { border-color: #7A6320; background: #1E1A0F; }
 .mk-decide h2 { color: #F0C64E; }
 .mk-decide h2::before { content: "◆ "; }
+.mk-read { font-size: 11.5px; font-weight: 700; color: #93A4BC; padding-left: 2px;
+  font-variant-numeric: tabular-nums; }
+.mk-read b { color: #fff; }
+.mk-read i { font-style: normal; color: #F0C64E; }
+.mk-read s { text-decoration: none; color: #7E92AE; font-weight: 600; }
 .mk-tag { display: inline-block; font-size: 9.5px; font-weight: 800; letter-spacing: .9px; padding: 3px 7px;
   border-radius: 5px; background: #223046; color: #9FC0EA; margin-left: 6px; vertical-align: middle; }
 
@@ -3401,6 +3521,18 @@ body.mk {
     <button data-d="35" aria-pressed="false">35</button>
     <button data-d="50" aria-pressed="false">50</button>
   </div>
+</div>
+<div class="mk-ctl">
+  <div class="mk-seg"><span>LIGHT / DARK</span>
+    <button data-m="auto" aria-pressed="true">Auto</button>
+    <button data-m="light" aria-pressed="false">Light</button>
+    <button data-m="dark" aria-pressed="false">Dark</button>
+  </div>
+  <div class="mk-seg"><span>PAGE vs TILE</span>
+    <button data-s="after" aria-pressed="true">Fixed</button>
+    <button data-s="before" aria-pressed="false">Before the fix</button>
+  </div>
+  <span class="mk-read" id="mk-read"></span>
 </div>
 
   <div class="mk-schemes"><button class="mk-sw" data-t="pastel" aria-pressed="false"><i style="background:linear-gradient(120deg,#7c9cf5 0 45%,#5ec9a3 45% 100%)"></i><span>Soft Pastel</span></button><button class="mk-sw" data-t="navy" aria-pressed="false"><i style="background:linear-gradient(120deg,#0F4C81 0 45%,#0EA5E9 45% 100%)"></i><span>Navy Blue</span></button><button class="mk-sw" data-t="charcoal" aria-pressed="false"><i style="background:linear-gradient(120deg,#2D2D2D 0 45%,#555555 45% 100%)"></i><span>Charcoal</span></button><button class="mk-sw" data-t="forest" aria-pressed="false"><i style="background:linear-gradient(120deg,#1B5E20 0 45%,#43A047 45% 100%)"></i><span>Forest Green</span></button><button class="mk-sw" data-t="gunmetal" aria-pressed="false"><i style="background:linear-gradient(120deg,#37474F 0 45%,#607D8B 45% 100%)"></i><span>Gunmetal</span></button><button class="mk-sw" data-t="purple" aria-pressed="false"><i style="background:linear-gradient(120deg,#4A148C 0 45%,#7B1FA2 45% 100%)"></i><span>Deep Purple</span></button><button class="mk-sw" data-t="orange" aria-pressed="false"><i style="background:linear-gradient(120deg,#BF360C 0 45%,#E64A19 45% 100%)"></i><span>Burnt Orange</span></button><button class="mk-sw" data-t="rose" aria-pressed="false"><i style="background:linear-gradient(120deg,#880E4F 0 45%,#E91E63 45% 100%)"></i><span>Rose</span></button><button class="mk-sw" data-t="blush" aria-pressed="false"><i style="background:linear-gradient(120deg,#C2185B 0 45%,#FF4D8D 45% 100%)"></i><span>Blush</span></button><button class="mk-sw" data-t="lagoon" aria-pressed="false"><i style="background:linear-gradient(120deg,#0E7C86 0 45%,#FF7A59 45% 100%)"></i><span>Lagoon</span></button><button class="mk-sw" data-t="orchid" aria-pressed="false"><i style="background:linear-gradient(120deg,#8E2DAF 0 45%,#00B295 45% 100%)"></i><span>Orchid</span></button><button class="mk-sw" data-t="berry" aria-pressed="false"><i style="background:linear-gradient(120deg,#B0306A 0 45%,#5A4FCF 45% 100%)"></i><span>Berry</span></button><button class="mk-sw" data-t="slatepop" aria-pressed="false"><i style="background:linear-gradient(120deg,#2E4374 0 45%,#FF6B6B 45% 100%)"></i><span>Slate Pop</span></button><button class="mk-sw" data-t="plumdusk" aria-pressed="false"><i style="background:linear-gradient(120deg,#5E3A87 0 45%,#E0568A 45% 100%)"></i><span>Plum Dusk</span></button><button class="mk-sw" data-t="carbonneon" aria-pressed="false"><i style="background:linear-gradient(120deg,#00C2A8 0 45%,#FF5DA2 45% 100%)"></i><span>Carbon Neon</span><u>DARK</u></button><button class="mk-sw" data-t="midnight" aria-pressed="false"><i style="background:linear-gradient(120deg,#1D4ED8 0 45%,#79C0FF 45% 100%)"></i><span>Midnight</span><u>DARK</u></button><button class="mk-sw" data-t="sunsetcoral" aria-pressed="false"><i style="background:linear-gradient(120deg,#ff6b6b 0 45%,#ff9f5a 45% 100%)"></i><span>Sunset Coral</span></button><button class="mk-sw" data-t="aurora" aria-pressed="false"><i style="background:linear-gradient(120deg,#3aa8c1 0 45%,#8b6ff0 45% 100%)"></i><span>Aurora</span></button><button class="mk-sw" data-t="citrus" aria-pressed="false"><i style="background:linear-gradient(120deg,#5bbf3a 0 45%,#ff8f3f 45% 100%)"></i><span>Citrus Punch</span></button><button class="mk-sw" data-t="berrynoir" aria-pressed="false"><i style="background:linear-gradient(120deg,#b5379a 0 45%,#5b52e0 45% 100%)"></i><span>Berry Noir</span></button><button class="mk-sw" data-t="oceandusk" aria-pressed="false"><i style="background:linear-gradient(120deg,#1f7a8c 0 45%,#ff7a59 45% 100%)"></i><span>Ocean Dusk</span></button><button class="mk-sw" data-t="midnightaurora" aria-pressed="false"><i style="background:linear-gradient(120deg,#1D4ED8 0 45%,#22D3EE 45% 72%,#A78BFA 72% 100%)"></i><span>Midnight Aurora</span><u>DARK</u></button><button class="mk-sw" data-t="midnightember" aria-pressed="false"><i style="background:linear-gradient(120deg,#1D4ED8 0 45%,#FB7185 45% 72%,#FBBF24 72% 100%)"></i><span>Midnight Ember</span><u>DARK</u></button><button class="mk-sw" data-t="midnightcitrus" aria-pressed="false"><i style="background:linear-gradient(120deg,#1D4ED8 0 45%,#38BDF8 45% 72%,#A3E635 72% 100%)"></i><span>Midnight Citrus</span><u>DARK</u></button><button class="mk-sw" data-t="midnightorchid" aria-pressed="false"><i style="background:linear-gradient(120deg,#1D4ED8 0 45%,#7C3AED 45% 72%,#E879F9 72% 100%)"></i><span>Midnight Orchid</span><u>DARK</u></button><button class="mk-sw" data-t="violetdawn" aria-pressed="false"><i style="background:linear-gradient(120deg,#1D4ED8 0 45%,#6D28D9 45% 72%,#C4B5FD 72% 100%)"></i><span>Violet Dawn</span></button><button class="mk-sw" data-t="sunsetdrift" aria-pressed="false"><i style="background:linear-gradient(120deg,#BE185D 0 45%,#F97316 45% 72%,#FBBF24 72% 100%)"></i><span>Sunset Drift</span></button><button class="mk-sw" data-t="deepreef" aria-pressed="false"><i style="background:linear-gradient(120deg,#0E7490 0 45%,#14B8A6 45% 72%,#A855F7 72% 100%)"></i><span>Deep Reef</span><u>DARK</u></button><button class="mk-sw" data-t="blushcloud" aria-pressed="false"><i style="background:linear-gradient(120deg,#E1789F 0 45%,#F9A8D4 45% 72%,#FBCFE8 72% 100%)"></i><span>Blush Cloud</span></button><button class="mk-sw" data-t="hotpink" aria-pressed="false"><i style="background:linear-gradient(120deg,#FF1F8F 0 45%,#FF6FB5 45% 72%,#7C3AED 72% 100%)"></i><span>Hot Pink</span></button></div>
@@ -3702,18 +3834,67 @@ body.mk {
     return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
   }
 
-  function setTheme(t) {
-    root.setAttribute('data-theme', t);
-    // AutoDark, replayed: it stamps data-appearance on genuinely light-token
-    // schemes that are being shown dark. Without it the tile system picks the
-    // wrong --sink and the whole ladder collapses on the dark schemes.
-    var isDark = DARK.indexOf(t) >= 0 || lum((PAL[t] || {})['--brand-bg']) < 0.18;
-    if (isDark) root.setAttribute('data-appearance', 'dark');
+  var theme = 'navy', mode = 'auto';
+
+  /* AutoDark, replayed exactly — including the half added 11 Sep 2026.
+     Two overrides, each guarded by the same measurement, each applied only to
+     a scheme that needs it:
+       dark  — wanted dark, scheme is light  -> darken it
+       light — wanted light, scheme is dark  -> lighten it
+     Asking for what a scheme already is sets NOTHING, because the generic
+     block would otherwise overwrite that scheme's own palette. */
+  function apply() {
+    root.setAttribute('data-theme', theme);
+    var schemeIsDark = DARK.indexOf(theme) >= 0 || lum((PAL[theme] || {})['--brand-bg']) < 0.18;
+    var wantDark = mode === 'dark' ? true
+                 : mode === 'light' ? false
+                 : (schemeIsDark || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches));
+    if (wantDark && !schemeIsDark) root.setAttribute('data-appearance', 'dark');
+    else if (!wantDark && schemeIsDark) root.setAttribute('data-appearance', 'light');
     else root.removeAttribute('data-appearance');
     [].forEach.call(document.querySelectorAll('.mk-sw'), function (b) {
-      b.setAttribute('aria-pressed', String(b.dataset.t === t));
+      b.setAttribute('aria-pressed', String(b.dataset.t === theme));
     });
+    measure();
+  }
+
+  function setTheme(t) {
+    theme = t;
+    apply();
     try { localStorage.setItem('mk-theme', t); } catch (e) {}
+  }
+
+  /* THE NUMBER HE ASKED THE QUESTION ABOUT.
+     "the background is the same color as the tiles on a lot of the color
+     schemes." Sixteen of the thirty were under 1.18; this prints the live
+     ratio for whichever scheme is on screen, measured off the rendered
+     pixels rather than off the tokens, so it cannot flatter the fix. */
+  function rgb(str) {
+    var m = String(str || '').match(/[\d.]+/g);
+    if (!m || m.length < 3) return [255, 255, 255];
+    return m.slice(0, 3).map(Number);
+  }
+  function relLum(c) {
+    var v = c.map(function (x) {
+      x = x / 255;
+      return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+  }
+  function measure() {
+    var page = document.querySelector('#mk-new .sym-page') || document.querySelector('.sym-page');
+    var tile = document.querySelector('#mk-new .sym-tile') || document.querySelector('.sym-tile');
+    var out = document.getElementById('mk-read');
+    if (!page || !tile || !out) return;
+    // getComputedStyle resolves color-mix for us, which is the whole point of
+    // measuring here instead of recomputing the mixes in JS.
+    var a = relLum(rgb(getComputedStyle(page).backgroundColor));
+    var b = relLum(rgb(getComputedStyle(tile).backgroundColor));
+    var hi = Math.max(a, b), lo = Math.min(a, b);
+    var ratio = (hi + 0.05) / (lo + 0.05);
+    var good = ratio >= 1.28;
+    out.innerHTML = 'page vs tile <b>' + ratio.toFixed(3) + '</b>' +
+      (good ? ' <s>— clears 1.28</s>' : ' <i>— under 1.28, they merge</i>');
   }
 
   function seg(sel, attr, apply) {
@@ -3737,16 +3918,42 @@ body.mk {
   seg('[data-v]', 'v', function (v) {
     document.getElementById('mk-new').hidden = v !== 'new';
     document.getElementById('mk-old').hidden = v !== 'old';
+    measure();
+  });
+  seg('[data-m]', 'm', function (v) {
+    mode = v;
+    try { localStorage.setItem('mk-mode', v); } catch (e) {}
+    apply();
   });
 
-  var t0 = 'navy', d0 = '20';
-  try { t0 = localStorage.getItem('mk-theme') || t0; d0 = localStorage.getItem('mk-deep') || d0; } catch (e) {}
+  /* "Before the fix" puts the two numbers that changed back where they were —
+     a 6% sink and no tile lift — on the page element only. It is the same
+     stylesheet underneath, so what it shows is genuinely what he was looking
+     at when he said the tiles merge into the background. */
+  seg('[data-s]', 's', function (v) {
+    [].forEach.call(document.querySelectorAll('.sym-page'), function (el) {
+      if (v === 'before') { el.style.setProperty('--sink', '6%'); el.style.setProperty('--tile-lift', '0%'); }
+      else { el.style.removeProperty('--sink'); el.style.removeProperty('--tile-lift'); }
+    });
+    measure();
+  });
+
+  var t0 = 'navy', d0 = '20', m0 = 'auto';
+  try {
+    t0 = localStorage.getItem('mk-theme') || t0;
+    d0 = localStorage.getItem('mk-deep') || d0;
+    m0 = localStorage.getItem('mk-mode') || m0;
+  } catch (e) {}
   if (!PAL[t0]) t0 = 'navy';
-  setTheme(t0);
+  mode = m0;
   root.setAttribute('data-deep', d0);
   [].forEach.call(document.querySelectorAll('[data-d]'), function (b) {
     b.setAttribute('aria-pressed', String(b.dataset.d === d0));
   });
+  [].forEach.call(document.querySelectorAll('[data-m]'), function (b) {
+    b.setAttribute('aria-pressed', String(b.dataset.m === m0));
+  });
+  setTheme(t0);
   body.classList.add('mk');
 })();
 </script>
