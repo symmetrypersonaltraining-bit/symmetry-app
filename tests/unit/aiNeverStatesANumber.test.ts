@@ -252,8 +252,10 @@ test("the food parser no longer asks a model for macros either", () => {
   // returned the per-100 g figures for a 200 g request.
   assert.match(PARSE, /YOU NEVER STATE A NUTRITION FIGURE/);
   assert.doesNotMatch(code(PARSE), /estimate macros for the stated amount/);
-  // The reply shape it accepts has no macro fields at all.
-  assert.match(PARSE, /\{"items":\[\{"name":string,"amount":number\|null,"unit":string\|null\}\]\}/);
+  // The reply shape it accepts has no macro fields at all. "context" (11 Sep)
+  // is where the food came from — a restaurant, a recipe — and is words, not
+  // a number.
+  assert.match(PARSE, /\{"items":\[\{"name":string,"amount":number\|null,"unit":string\|null,"context":string\|null\}\]\}/);
   assert.match(code(PARSE), /validate: validateParsedNames/);
 });
 
@@ -264,7 +266,7 @@ test("parse resolves every item against the catalogue", () => {
   // how two screens end up disagreeing about the same dinner.
   assert.match(code(PARSE), /priceNamedFoods\(/,
     "parse must price its items through the shared resolver");
-  assert.match(code(OP), /resolveFood\(deps, n\.name, n\.amount, n\.unit\)/);
+  assert.match(code(OP), /resolveFood\(deps, n\.name, n\.amount, n\.unit, n\.context \?\? null\)/);
   // The ROW's name goes back, not the words typed.
   assert.match(code(OP), /name: got\.name/);
 });
@@ -338,11 +340,14 @@ test("the retry finds rows — it never redefines the food", () => {
   // The alternate term is a way of reaching candidates. Judging against it
   // instead of against what they actually said is how "cinnamon roll" would
   // start matching whatever the second search dragged in.
+  // withContext(term) is still their words: the term they used plus, when they
+  // gave one, where the food came from. Never the alternate search term.
   assert.match(
     code(OP),
-    /THEY ASKED FOR:\\n\$\{term\}/,
+    /THEY ASKED FOR:\\n\$\{withContext\(term\)\}/,
     "the pick is judged against the invented search term rather than the person's words",
   );
+  assert.doesNotMatch(code(OP), /THEY ASKED FOR:\\n\$\{alt\}/);
   assert.match(RESOLVE, /never a different food you think is similar/);
 });
 

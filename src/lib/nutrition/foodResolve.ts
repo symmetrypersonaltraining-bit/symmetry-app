@@ -525,6 +525,7 @@ How to choose:
 - USE THE NUMBERS AS EVIDENCE. A banana at 242 kcal with 14 g of fat is not a banana, whatever it is called. A chicken breast with 3.6 g of carbs is suspect. If a row's macros are impossible for the food they named, do not pick it.
 - Match the preparation where a row offers it — cooked vs raw, skinless vs with skin. Where no row offers it, the closest preparation of the same food is still the right pick.
 - A DIFFERENT FOOD IS NOT A CLOSE MATCH. "Chicken breast, roll, oven-roasted" is deli meat and is not plain chicken breast. "Chipotle White Rice" is not generic white rice. A plain sourdough roll is not a cinnamon roll. Reject those.
+- CONTEXT, when a line of it is given, says where the food came from. A restaurant or takeout dish is the dish AS SERVED, made from real meat, cheese and vegetables. A packaged retail product, a frozen meal or bowl, a seasoning packet, a marinade or a soup that happens to carry the same words is NOT that dish — "Beef & Chorizo Taco Bowl" (frozen) is not a restaurant queso with ground beef, and "Fully Cooked Beef Fajitas" (packaged) is not a fajita plate. For a restaurant dish pick a restaurant row, a generic dish row, or the plain ingredient (skirt steak for beef fajitas); if the list holds only packaged or frozen products, answer 0 and the app will look further.
 - ANSWER 0 ONLY WHEN NOTHING IN THE LIST IS THAT KIND OF FOOD. 0 is for "there is no cinnamon roll here", not for "there is no SOURDOUGH cinnamon roll here". Answering 0 when a good generic row is sitting in the list sends the person off to search a database by hand for a food it already has, which is the worst outcome of the three.`;
 
 /**
@@ -595,6 +596,7 @@ Rules:
 - p, c and f are for ONE of them, in grams, and must be consistent with "grams". They are the nutrition-label numbers, not per 100 g.
 - Do NOT return calories. The app derives them.
 - "confident": true when this is a specific branded product whose label is well known, or a plain whole food (an egg, a banana, chicken breast). False when you are reasoning from a typical recipe — a restaurant dish, a homemade item, something regional.
+- A RESTAURANT OR TAKEOUT DISH is answered for the whole portion as served, not a label serving: "serving" is "plate" or "bowl", and "grams" is what the plate holds. A Tex-Mex fajita plate is about 170 to 225 g of meat plus its grilled onions and peppers; a bowl of queso is about 170 g; a restaurant side of rice or beans is about 150 g. If the CONTEXT line names a restaurant, that is what they ate.
 - If you do not actually know this food, return {"unknown":true}. Say so rather than inventing. A number nobody can check is worse than no number.`;
 
 export type FoodEstimate = { serving: string; grams: number; p: number; c: number; f: number; confident: boolean };
@@ -685,6 +687,7 @@ Rules:
 - "grams" is the edible weight of ONE, as it is served. One large egg is about 50 g. One 5-inch pancake is about 77 g. One slice of processed cheese is about 21 g. One pat of butter is about 5 g. One slice of bread is about 28 g.
 - Use the size they gave you. "5 inch pancake" and "silver dollar pancake" are not the same weight.
 - If they named no measure at all, answer for one ordinary portion of that food as a person actually takes it, and give that portion its normal name: butter -> "pat", cheese -> "slice", peanut butter -> "tbsp", rice -> "cup".
+- A RESTAURANT OR TAKEOUT DISH (the CONTEXT line says so) with no measure named is one plate or one bowl AS SERVED, never a retail label serving: a meat entree such as fajitas or carne asada is about 170 to 225 g of meat plus its vegetables, a bowl of queso or dip about 170 g, a restaurant side of rice or beans about 150 g. Name it "plate" or "bowl".
 - "serving" must be a countable word. Never "100 g". Never a weight.
 - Do NOT return calories, protein, carbs or fat. The app reads all of those from the database row. You are being asked for a weight and only a weight.
 - If you do not know what one of these weighs, return {"unknown":true}. Say so rather than inventing — a weight nobody can check is worse than no weight.`;
