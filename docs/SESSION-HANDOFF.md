@@ -584,18 +584,23 @@ He ruled on every archived client individually. Do not re-ask:
 
 | | archived | last paid | outcome |
 |---|---|---|---|
-| Tina Haley | 13 Aug | 12 Jul | cut off, first run |
-| Christine Latham | 31 Aug | 22 Jul | cut off, first run |
-| Brooke Reynolds | 31 Jul | never | cut off, first run — no login to ban |
-| Robert Miller | 1 Sep | 1 Aug | cut off, first run |
-| Jada Cook | 13 Aug | never | auto cut-off **12 Sep** |
-| Tania Millan | 13 Aug | never | auto cut-off **12 Sep** |
+| Tina Haley | 13 Aug | 12 Jul | ✅ **revoked 10 Sep 07:07 Central** — first run |
+| Christine Latham | 31 Aug | 22 Jul | ✅ **revoked 10 Sep 07:07 Central** — first run |
+| Brooke Reynolds | 31 Jul | never | ✅ **revoked 10 Sep 07:07 Central** — no login to ban |
+| Robert Miller | 1 Sep | 1 Aug | ✅ **revoked 10 Sep 07:07 Central** — first run |
+| Jada Cook | 13 Aug | never | keeps it through 12 Sep → auto cut-off on the **13 Sep** run |
+| Troy Schnitzler | **10 Sep** | never | archived after the first run, not by this session; keeps it through **10 Oct** |
 | Bobbie Page | 31 Aug | 1 Aug | KEPT — override to **1 Oct** |
 | Test Client | 13 Aug | never | KEPT — override to 2099-12-31 |
+| ~~Tania Millan~~ | — | — | **UNARCHIVED 11 Sep** at his word: *"I need her to have access to check it out."* Never revoked, so no unban needed. `bak_tania_millan_unarchive_20260911` |
+
+**The first run did exactly what he ruled** — four rows, 07:07 Central (Vercel
+fired the 11:30 UTC cron 37 minutes late, which is normal), nobody else touched.
 
 His words: *"Tina, Christine and Brooke can be archived, not robert!"*, then
 *"robert is archived i forgot he quit!!"*, then *"Jada n Tania can be archived,
-leave test client"*.
+leave test client"* — and on 11 Sep, *"take Tania out of archived I need her to
+have access to check it out"*.
 
 **ROBERT MILLER — the round trip worth not repeating.** He was first reported as
 wrongly archived (*"Robert still trains but I only do programming but he's still
