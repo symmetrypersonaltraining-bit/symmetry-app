@@ -1272,25 +1272,82 @@ the screen comes from the **salvage** path — which is why drafts kept landing
 +157 kcal / +62 g protein off target. **NOT FIXED.** It is the first thing to
 do on this screen.
 
-### STILL OPEN ON THE NUTRITION SCREEN
+### 11 SEP, EVENING — THE SECOND ROUND OFF THE WALK
 
-1. **The maxTokens truncation above** — first.
-2. **His retest of the eleven** — the list is in the 11 Sep session log.
-3. **Per-meal ⋯ and Edit** (inventory #31/#32) — his next batch, once a plan exists.
-4. **Draft editor round 2:** swap a food for another (library or AI-parsed,
-   priced through the catalogue), rebuild one meal, reorder meals, and a live
-   before/after delta. Plus *"the AI should automatically adjust the drafted
-   meals to match those calories"* when targets change — a re-fit action, not
-   a silent rewrite.
-5. **Every mic in the app: click on, click off.** *"I don't want any mics
+Three more PRs, all merged, all confirmed by him on the live app the same
+night. `docs/audit/SCREEN-WALKTHROUGH.md` carries the reasoning; this is the
+index.
+
+| | what | his words |
+|---|---|---|
+| `#59` | **The draft's numbers follow every edit.** Removing a food by CLEARING ITS AMOUNT left every macro in place — `scaleItemTo` ran three cases through one guard, so "6 oz chicken, 204 cal" became " oz chicken, 204 cal". ✕ was always fine. | *"it does adjust the calories on the plan that it does not remove when I remove it"* |
+| `#59` | **The arithmetic left the screen.** `src/lib/nutrition/draftEdit.ts` owns `recomputeDraft` and every edit that feeds it; `tests/unit/draftEdit.test.ts` runs his exact sequence. Inside a 4,500-line component it was arithmetic nobody could run. | — |
+| `#59` | **"Recommended" is frozen** to the draft as it arrived. It read `draft.targets`, which he can edit, so it silently became whatever he had just typed. | *"Recommended needs to stay what the AI recommended. So we have a comparison."* |
+| `#59` | **The "This plan comes to…" banner is GONE.** Each target box carries `1,900 of 1,850` — actual first, target second — red when that field is out, on `planTargetDrift`'s own 3%/5g. | *"And then we don't need that banner at all."* |
+| `#59` | **A percentage split is entered as a SET.** Changing one no longer moves the other two; the boxes go red with the running total and Accept is disabled until they reach 100%. | *"when I change one, it should not change the others"* |
+| `#59` | **Back on his phone stops at a sign-in screen.** Chrome restores an installed PWA's history across launches, so Back walked into a `/login` entry from an earlier one, out of the bfcache, so the middleware never ran. `/login` now bounces a live session on mount and on `pageshow`. | *"it signs me out and puts me on the sign in screen"* |
+| `#59` | **Tiles stand off the page in all thirty schemes** — 16 were under 1.18, Citrus worst at 1.130, because the page came from `--brand-bg` and the tile from `--brand-surface`, two independent tokens. Sink 6% → 12%. | *"it's not drastic enough to really make the tile stand out"* |
+| `#59` | **Light / Dark / Auto**, in Settings above the swatches. `AutoDark` had READ `symmetry_appearance` since 25 Jul and nothing ever wrote it. The seven schemes that are dark by design gained `[data-appearance="light"]`. | *"There should be a light mode and a dark mode toggle"* |
+| `#60` | **Checked in BOTH appearances.** The first pass measured as-designed only. A 3% dark lift failed the moment Charcoal, Deep Purple or Rose was flipped dark (1.244 / 1.249 / 1.277). 5% puts the worst of all sixty combinations at 1.292 — the same as the worst light scheme. `tests/unit/tilesStandOffThePage.test.ts` is the guard, and it fails against the pre-11-Sep numbers. | — |
+
+**The mock-up sheet** `docs/mockups/nutrition-format.html` (regenerate with
+`SCRATCH=<dir> python3 scripts/gen-nutrition-mockup.py`) now has a Light /
+Dark / Auto segment replaying AutoDark's real rule, a **"Before the fix"**
+toggle that puts the 6% sink back, and a live contrast readout measured off
+rendered pixels. Published for him as an Artifact on 11 Sep.
+
+**Confirmed by him on the live app, 11 Sep:** the draft numbers following add /
+clear / ✕ / remove-meal / revert; the percentage split going red and blocking
+Accept; back from Recipes on his phone; the Light/Dark toggle. Also confirmed
+earlier the same day: recommend-my-targets, the consult asking for a deleted
+height, plan versions, and Trends being gone.
+
+### STILL OPEN ON THE NUTRITION SCREEN — TOMORROW'S LIST
+
+In his order.
+
+1. **The maxTokens truncation.** `plan-build` sets `maxTokens: 8000` and the
+   replies run **6,776-8,686** tokens. The JSON truncates mid-structure, both
+   attempts fail `No valid JSON`, and what reaches the screen comes from the
+   **salvage** path — which is why drafts kept landing +157 kcal / +62 g
+   protein off target. *"Fix the maxTokens truncation first thing tomorrow."*
+   **FIRST.**
+2. **AI-parse a food when adding to a draft.** The add-food sheet offers the
+   library only. *"There needs to be an option to AI parse, look up a food and
+   have AI go online and find the actual numbers for it just like everywhere
+   else. Make sure that's for the drafts for all options of creating a plan
+   with AI, not just this one."* `/api/nutrition-ai/parse` already exists.
+3. **Per-meal ⋯ and Edit** (inventory #31/#32). Explicitly deferred to
+   tomorrow; needs a saved plan on Test Client first.
+4. **Every mic in the app: click on, click off.** *"I don't want any mics
    cutting off while somebody pauses."* Four files use SpeechRecognition;
    `dictation.ts` sets `continuous = false`. One shared hook, app-wide.
+5. **Draft editor round 2:** swap a food for another IN PLACE, rebuild one meal
+   with AI to a per-meal target, reorder meals, and a before/after delta. Plus
+   *"the AI should automatically adjust the drafted meals to match those
+   calories"* when targets change — a re-fit action, not a silent rewrite.
 6. **The AI still cannot see the `recipes` table.** `libraryForAi.ts` serves a
    hardcoded list; anything added on `/recipes` is invisible to every builder
-   and to the assistant. Contradicts his Batch 1 ruling and is a step-0 item.
+   and to the assistant. Contradicts his Batch 1 ruling; step-0 item.
 7. **The plan builder still invents macros** for any item it makes up — the
    class his 9 Sep ruling removed from chat, still live here.
 8. **A library-vs-custom switch** for the builders — his design ask, not built.
+9. **The rest of the Nutrition walk.** Batches 2-6 of the control inventory are
+   unwalked. *"Anything else that's left to confirm on the audit needs to go on
+   tomorrow's list."*
+10. **The messages notification split** — PRs and finished workouts out of the
+    group chat and into a notifications bar/bell inside Messages only; messages
+    from him or other clients keep the existing push. **Mock-up only**, not
+    built. Not started.
+11. **Test Client's `ai_daily_plan_build_limit` back to 3/day.** Currently 200.
+    The 14 Sep Routine `trig_01EcEWnV4eU36KP2xKczDpes` carries this.
+
+**The stale-PWA-history half of the back button** is not on the list because it
+is not harmful: *"from pretty much anywhere else, it goes back to the progress
+tab"* is Chrome replaying real screens from an earlier launch. If it ever reads
+wrong, stamp each entry with an in-session depth using `replaceState` ONLY —
+never push, see the v2/v3 sentinel note in `src/lib/nav/backFromHere.ts`.
+
 
 ### THE NEXT SESSION'S JOB — the Nutrition button-by-button walk
 
