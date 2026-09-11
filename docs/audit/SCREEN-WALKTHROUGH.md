@@ -3626,3 +3626,73 @@ alongside an `ok`. The replies were 6,776-8,686 output tokens against
 failed, and what reached the screen came from the **salvage** path
 (`validatePlanAcceptingDrift`). That is also why his drafts kept missing their
 targets. **Not fixed here** — it is its own change, and it is the next one.
+
+## Interlude — the app works out what you burn  ·  11 Sep 2026
+
+Dustin, mid-audit: *"For the build my own plan, when I have AI set the numbers,
+where is it getting my total calorie expenditure from? Because I never put my
+height in the test client app, and it needs my height to be able to figure out
+that number accurately. So something is missing."*
+
+**It was getting it from nowhere.** There was no expenditure calculation in this
+app at all. The consult handed the model a weight, a body fat and a goal, and
+the model wrote sentences like *"approximately 500-600 kcal below estimated
+TDEE"* — having estimated that TDEE from nothing. No height reached it (the
+column did not exist until that afternoon), no age, no sex.
+
+So: *"set up the TDEE calculation in here in the code… If those numbers are not
+already in my profile, it needs to ask for them and put them in my profile for
+future use, and then it needs to get an accurate number to build the plan off
+of that."*
+
+### The arithmetic is arithmetic now
+
+`src/lib/nutrition/expenditure.ts`, with the reasoning in it:
+
+- **BMR** — Katch-McArdle from lean mass when body fat is known, Mifflin-St
+  Jeor otherwise. Which one ran is stated to the client.
+- **Activity** — split in two on purpose. Occupation (desk / mixed / on your
+  feet) is the NEAT floor; each training day adds on top. One "activity level"
+  dropdown makes someone with a desk job and five sessions a week choose
+  between them, and that is most of this roster.
+- **The goal shift is a percentage, not a flat 500.** 500 off a 3,600 kcal day
+  is a nudge; off 1,700 it is a crash. A percentage says the same thing to both.
+- **Floors** — 1,500 / 1,200 kcal, and 0.3 g/lb of fat. When the floor catches
+  the arithmetic, the client is told.
+- **Protein** on lean mass when body fat is known, bodyweight otherwise. Carbs
+  take the remainder, which is the only one of the three that should.
+
+### It stops rather than guessing
+
+A missing sex, age, height or weight returns **422 with the list**, and the
+sheet asks for exactly those, saves them to the profile, and resumes the build
+without re-asking the three chips. A defaulted sex alone moves the answer by
+**166 kcal** and nothing on screen would say so — which is the body-fat screen's
+standing bug (age defaults to 38, sex to "male") arriving somewhere new.
+
+A weight typed there is also written as today's weigh-in, because the
+calculation reads the newest metric first and an older one would otherwise keep
+winning over what was typed thirty seconds ago.
+
+### The computed targets win
+
+The model is told the targets are decided and not to recompute them — and then
+the route **overwrites** `targets` and `reasoning` with the computed ones
+anyway, and redoes the drift check against them. Telling a model not to do
+something is a hope; this is the guarantee. The reasoning a client reads is now
+built from the real BMR, the real TDEE and the real split, and it says plainly
+that these are estimates from published formulas.
+
+### Same inputs, same answer
+
+The complaint underneath all of it: two clients with identical stats got
+different targets on different days, because a model was deciding. Pinned by a
+test.
+
+### The shortcut card is the same engine
+
+His check: *"make sure those do the exact same thing as those same options from
+the actual build my own plan with AI menu — the exact same AI, everything works
+exactly the same."* They already did. **Five doors, one sheet** — two on the
+"turn this into my plan" card, three in the build menu, all `kind: "aiplan"` at
+the same mode. A test pins the count so nobody builds a sixth, lighter path.

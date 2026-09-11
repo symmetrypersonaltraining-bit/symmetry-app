@@ -15,13 +15,17 @@ import { libraryPromptBlock } from "@/lib/nutrition/libraryForAi";
 import { CT_TODAY } from "@/lib/ai/coach-context";
 import { modelFor, callClaudeJson } from "@/lib/ai/anthropic";
 import { aiTierFor } from "@/lib/ai/tier";
-import { validatePlanOnTarget, validatePlanAcceptingDrift, extractJson } from "@/lib/ai/nutrition-json";
+import { validatePlanOnTarget, validatePlanAcceptingDrift, extractJson, planTargetDrift } from "@/lib/ai/nutrition-json";
 import { logUsage } from "@/lib/ai/meter";
 import { Db, enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
 import { coachForViewer } from "@/lib/coachIdentity";
 import { nutrientPromptSpec } from "@/lib/nutrition/nutrients";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
 import { planIsLocked, lockedPlanMessage } from "@/lib/nutrition/planLock";
+import {
+  ageFrom, missingForExpenditure, parseConsultAnswers, recommendTargets,
+  MISSING_LABEL, type BodyInputs, type Recommendation,
+} from "@/lib/nutrition/expenditure";
 
 // A function of the trainer using it, not a module constant. This is
 // trainer-facing, so no client ever saw the wrong name — but it addressed
@@ -61,6 +65,38 @@ function cleanTargets(t: unknown): Targets | null {
   if (![kcal, p, c, f].every((n) => Number.isFinite(n) && n > 0)) return null;
   if (kcal < 800 || kcal > 6000) return null;
   return { kcal, p: Math.round(p), c: Math.round(c), f: Math.round(f) };
+}
+
+/**
+ * Everything the expenditure calculation needs, from the client's own record.
+ *
+ * Weight prefers the newest weigh-in over `clients.current_weight`, which is a
+ * starting figure someone typed at onboarding and is often months stale.
+ */
+async function bodyInputsFor(db: Db, clientId: string): Promise<{
+  inputs: Partial<BodyInputs>; trainingDays: number;
+}> {
+  const today = CT_TODAY();
+  const [clientRes, metricsRes] = await Promise.all([
+    db.from("clients").select("date_of_birth, height_in, sex, current_weight, current_body_fat_pct, training_frequency, days_per_week").eq("id", clientId).maybeSingle(),
+    db.from("metrics").select("metric_date, weight, body_fat_pct").eq("client_id", clientId).order("metric_date", { ascending: false }).limit(10),
+  ]);
+  const c = (clientRes.data || {}) as Record<string, unknown>;
+  const metrics = (metricsRes.data as { weight: number | null; body_fat_pct: number | null }[]) || [];
+  const num = (v: unknown) => (v == null || v === "" ? null : Number(v));
+  const latestWeight = metrics.find((m) => m.weight != null)?.weight ?? null;
+  const latestBf = metrics.find((m) => m.body_fat_pct != null)?.body_fat_pct ?? null;
+  const sex = c.sex === "male" || c.sex === "female" ? c.sex : undefined;
+  return {
+    inputs: {
+      sex,
+      ageYears: ageFrom(c.date_of_birth as string | null, today) ?? undefined,
+      heightIn: num(c.height_in) ?? undefined,
+      weightLb: (latestWeight ?? num(c.current_weight)) ?? undefined,
+      bodyFatPct: latestBf ?? num(c.current_body_fat_pct),
+    },
+    trainingDays: Number(c.training_frequency ?? c.days_per_week ?? 0) || 0,
+  };
 }
 
 async function consultContext(db: Db, clientId: string | null): Promise<string> {
@@ -138,6 +174,8 @@ export async function POST(req: NextRequest) {
     if (!apiKey) return missingKeyResponse();
 
     let userText: string;
+    // Set in consult mode: the targets and the sentences, both computed here.
+    let recommended: Recommendation | null = null;
     if (foods) {
       // Targets are OPTIONAL here. Someone who says "build it round chicken and
       // rice" usually has targets already; if they do not, the same client data
@@ -151,9 +189,27 @@ export async function POST(req: NextRequest) {
     } else if (targets) {
       userText = `Build a 5-meal plan for these exact daily targets: ${targets.kcal} kcal, ${targets.p}g protein, ${targets.c}g carbs, ${targets.f}g fat.`;
     } else {
-      const answersStr = JSON.stringify(consult!.answers ?? consult).slice(0, 4000);
-      const ctx = await consultContext(supabase, clientId);
-      userText = `CONSULT MODE — first recommend daily macro targets with brief reasoning, then build the 5-meal plan.\n\nClient data (server-assembled):\n${ctx}\n\nConsult answers from the client:\n${answersStr}`;
+      // ── THE CONSULT NO LONGER ASKS THE MODEL FOR A NUMBER ────────────────
+      //
+      // Dustin, 11 Sep: "where is it getting my total calorie expenditure
+      // from? ... something is missing." It was getting it from nowhere. The
+      // targets are now arithmetic — see expenditure.ts — and the model is
+      // handed them to BUILD to, which is the part it is actually good at.
+      //
+      // Missing an input is a STOP, not a default. A wrong sex alone moves the
+      // answer 166 kcal and nothing on screen would say so.
+      const { inputs, trainingDays } = await bodyInputsFor(supabase, clientId as string);
+      const missing = missingForExpenditure(inputs);
+      if (missing.length) {
+        return NextResponse.json({
+          needsProfile: missing,
+          error: `Before the coach can work out your daily burn it needs your ${missing.map((m) => MISSING_LABEL[m]).join(", ")}.`,
+        }, { status: 422 });
+      }
+      const { goal, pace, occupation } = parseConsultAnswers((consult!.answers ?? consult) as Record<string, unknown>);
+      recommended = recommendTargets(inputs as BodyInputs, occupation, trainingDays, goal, pace);
+      const t = recommended.targets;
+      userText = `CONSULT MODE — the targets are ALREADY DECIDED and are given below. Do NOT recompute them, do not adjust them, and do not write your own reasoning: build the 5-meal plan to hit them exactly.\n\nDaily targets: ${t.kcal} kcal, ${t.p}g protein, ${t.c}g carbs, ${t.f}g fat.\n\nClient data (server-assembled):\n${await consultContext(supabase, clientId)}`;
     }
 
       // Tier-aware — see tests/unit/aiTier.test.ts for why partial coverage is
@@ -189,6 +245,17 @@ export async function POST(req: NextRequest) {
         );
       }
       plan = salvaged;
+    }
+    // THE COMPUTED TARGETS WIN. The model was told not to touch them; this is
+    // what makes that true rather than hoped for, and it is also what puts our
+    // reasoning — built from the real BMR, TDEE and split — on the screen
+    // instead of the model's prose about them.
+    if (recommended) {
+      plan = { ...plan, targets: recommended.targets, reasoning: recommended.reasoning };
+      const { ok, drift } = planTargetDrift(plan);
+      plan = ok
+        ? { ...plan, targetsMet: undefined, drift: undefined }
+        : { ...plan, targetsMet: false as const, drift };
     }
     // Draft only — the UI shows it for confirmation and performs the insert.
     return NextResponse.json({ draft: true, plan });
