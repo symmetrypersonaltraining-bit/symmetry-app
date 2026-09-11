@@ -5,6 +5,17 @@ session reads it first and updates it before finishing.** The `HANDOFF-*.md`
 files with dates in the name are history — do not read them for current state,
 and do not create another one.
 
+> 🔵 **PICK UP HERE — the Nutrition walk, mid-screen.** Batches 1 and 1b are
+> WALKED and recorded. Eleven changes shipped 11 Sep off that walk (the list is
+> in section 4). **What is left on this screen:** his own retest of those
+> eleven, then the per-meal **⋯** and **Edit** buttons (inventory #31/#32),
+> then draft-editor round 2, then every mic in the app. `docs/audit/AUDIT-RESUME.md`
+> and the six batches in `SCREEN-WALKTHROUGH.md` own the detail.
+>
+> ⚠️ **Test Client's `ai_daily_plan_build_limit` is 200**, set by hand so he
+> could test the builder. Put it back to NULL when the walk is done — the
+> 14 Sep Routine already carries that instruction.
+>
 > ⏳ **UNTIL 14 SEP: the meal-plan builder is 10/day so he can test it.** The
 > permanent limit is 3/day (`meter-core.ts`, his ruling 11 Sep). The 10 is a
 > dated override that expires by itself on the 15th; what does NOT expire is the
@@ -1228,6 +1239,50 @@ gig or full time). Cost-cut questions answered: $312k → $274k came from the
 developer going part-time after launch, the marketing lead starting in January
 not November, 12% contingency, and tranche draws; dropping marketing spend
 was modelled ($15k/mo) and came out worse, so it stayed.
+
+### 11 SEP — WHAT SHIPPED OFF THE NUTRITION WALK
+
+Eleven changes, all merged, all his rulings. Do not re-derive any of them.
+
+| | what | why |
+|---|---|---|
+| `64a1b83` | Batch 1 walked — five WORKS, plan menu deferred | his verdicts, in his words |
+| `5ae7467` | Plan menu inventoried as its own batch | *"that layered menu"* |
+| `dd6e721` | **An unlogged day is a zero** — the 14-day average divides by the window, and the AI is told which days were blank | reversed the old per-logged-day rule on purpose |
+| `e106f02` | **Trends retired** | *"that is essentially the progress tab"* |
+| `223ad15` | **A back button on every non-tab page**, same rule as the phone's | desktop PWA had no way off `/recipes` |
+| `bd32cae` | Plan-build limit **3/day permanent, 10/day to 14 Sep** | he was blocked at 1/day |
+| `ff3f68e` | **Height and sex** on the client, collected at onboarding, assessment and profile | the consult had nothing to compute from |
+| `581c771` | **The AI draft is editable** before accepting | *"the client needs the ability to override those numbers"* |
+| `758759f` | **Macros and calories follow each other** — grams, calories or percent, one control both places | *"they all need to follow each other"* |
+| `13170e0` | **TDEE is computed in code**, and the consult asks for what it is missing | *"where is it getting my total calorie expenditure from?"* |
+
+**The finding that explains a lot of the bad numbers:** `plan-build` sets
+`maxTokens: 8000` and the replies run **6,776-8,686** tokens. The JSON is
+truncated mid-structure, both attempts fail `No valid JSON`, and what reaches
+the screen comes from the **salvage** path — which is why drafts kept landing
++157 kcal / +62 g protein off target. **NOT FIXED.** It is the first thing to
+do on this screen.
+
+### STILL OPEN ON THE NUTRITION SCREEN
+
+1. **The maxTokens truncation above** — first.
+2. **His retest of the eleven** — the list is in the 11 Sep session log.
+3. **Per-meal ⋯ and Edit** (inventory #31/#32) — his next batch, once a plan exists.
+4. **Draft editor round 2:** swap a food for another (library or AI-parsed,
+   priced through the catalogue), rebuild one meal, reorder meals, and a live
+   before/after delta. Plus *"the AI should automatically adjust the drafted
+   meals to match those calories"* when targets change — a re-fit action, not
+   a silent rewrite.
+5. **Every mic in the app: click on, click off.** *"I don't want any mics
+   cutting off while somebody pauses."* Four files use SpeechRecognition;
+   `dictation.ts` sets `continuous = false`. One shared hook, app-wide.
+6. **The AI still cannot see the `recipes` table.** `libraryForAi.ts` serves a
+   hardcoded list; anything added on `/recipes` is invisible to every builder
+   and to the assistant. Contradicts his Batch 1 ruling and is a step-0 item.
+7. **The plan builder still invents macros** for any item it makes up — the
+   class his 9 Sep ruling removed from chat, still live here.
+8. **A library-vs-custom switch** for the builders — his design ask, not built.
 
 ### THE NEXT SESSION'S JOB — the Nutrition button-by-button walk
 
