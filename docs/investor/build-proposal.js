@@ -53,14 +53,14 @@ const children = [];
 // ---- Cover block
 children.push(new Paragraph({ spacing: { after: 60 }, children: [new TextRun({ text: "SYMMETRY PERSONAL TRAINING", font: FONT, size: 20, bold: true, color: GOLD, characterSpacing: 40 })] }));
 children.push(new Paragraph({ spacing: { after: 120 }, children: [new TextRun({ text: "Symmetry App: Launch Investment Proposal", font: FONT, size: 40, bold: true, color: NAVY })] }));
-children.push(p("A $274,000 loan plus 10% ownership to take a working coaching platform to market", { size: 26, color: GREY, after: 200 }));
+children.push(p("A $274,000 loan facility, drawn as needed, plus 10% ownership to take a working coaching platform to market", { size: 26, color: GREY, after: 200 }));
 children.push(table(["", ""], [
   row(["Prepared for", "Lauren Standefer"]), row(["Prepared by", "Dustin Gautreaux, Symmetry Personal Training"]),
   row(["Date", "12 September 2026 (replaces the proposal of 3 July 2026)"]), row(["Contact", "symmetrypersonaltraining@gmail.com · 972-832-6201 · Princeton, TX"]),
 ], [2200, 7160]));
 children.push(p("", { after: 120 }));
 children.push(h1("The proposal in five sentences"));
-children.push(p("The Symmetry app already exists and runs my training business every day: 27 clients, 1,330 workouts and 13,975 sets logged since June, 2,367 meals logged, and $19,472 collected through its own invoicing. This money is not to build it; it is to turn it into a product other trainers and individuals pay for. I am asking for $274,000, drawn in two tranches, to fund one developer, a marketing lead, the launch, and six months of operations, with a review five months after launch. In return you receive 7% interest on the loan, with payments starting the month the app first covers its own running costs, and a 10% ownership stake in the company with a share of profits for as long as you hold it. Neither of us draws profit until the company has four months of expenses saved, and my training income stays separate, so the app never has to feed me before it feeds the business."));
+children.push(p("The Symmetry app already exists and runs my training business every day: 27 clients, 1,330 workouts and 13,975 sets logged since June, 2,367 meals logged, and $19,472 collected through its own invoicing. This money is not to build it; it is to turn it into a product other trainers and individuals pay for. I am asking for a committed $274,000 facility, drawn month by month only as the business needs it (about $238,000 on the base path, $146,000 on the optimistic), to fund one developer, a marketing lead, the launch, and six months of operations, with a review five months after launch. In return you receive 7% interest on the loan, with payments starting the month the app first covers its own running costs, and a 10% ownership stake in the company with a share of profits for as long as you hold it. Neither of us draws profit until the company has four months of expenses saved, and my training income stays separate, so the app never has to feed me before it feeds the business."));
 
 // ---- 1
 children.push(h1("1. What already exists"));
@@ -81,7 +81,7 @@ children.push(p([b("Why this matters to you: "), r("the 123,000-line codebase wa
 
 // ---- 2
 children.push(h1("2. What the $274,000 covers"));
-children.push(p("A fractional marketing lead and one senior developer start in January 2027; I am the product owner. Two months of build, a web launch in March 2027, six months of launch marketing, and a review in August 2027. After the web launch the developer drops to three days a week, because the remaining work is store packaging and fixes, not a build. The money is drawn in two tranches, about $60,000 in January and the balance at launch, so interest accrues only on money in use. Every line is a real launch cost; nothing here is salary for me."));
+children.push(p("A fractional marketing lead and one senior developer start in January 2027; I am the product owner. Two months of build, a web launch in March 2027, six months of launch marketing, and a review in August 2027. After the web launch the developer drops to three days a week, because the remaining work is store packaging and fixes, not a build. The money is a committed facility drawn month by month against that month's shortfall, so interest accrues only on money actually in use: the base path draws about $238,000 of the $274,000 before it turns, the optimistic about $146,000, and the rest stays available if the launch runs slower. Every line is a real launch cost; nothing here is salary for me."));
 children.push(table(["Block", "Amount"], [
   row(["One-time setup: Texas LLC and registered agent, operating agreement, terms of service and privacy policy with lawyer review, trademark, Apple and Google developer accounts, D-U-N-S, SMS registration, insurance", "$8,000"]),
   row(["Pre-launch, January to February 2027: marketing lead, content and waitlist $24,000; developer $20,000; hosting, legal, tools $4,600", "$48,600"]),
@@ -100,12 +100,12 @@ children.push(table(["Monthly running costs", "Pre-launch (Jan–Feb)", "Launch 
 ], [4260, 1700, 1700, 1700], { numeric: [1, 2, 3] }));
 children.push(p("", { after: 80 }));
 children.push(p([b("Who runs the marketing. "), r("Not a full-service agency: at $20,000 a month an agency takes $6,500 to $10,000 in fees, wants a 6 to 12 month contract above the entry tier, includes no PR, and still needs me for positioning and every piece of trainer-facing content. The plan uses a fractional marketing lead who has launched software before (1 to 2 days a week), a freelance media buyer on a flat fee, and a content freelancer, started January 2027 so the funnel is working on launch day, with a three-month fitness-industry PR push around March. If a single company is preferred, two fit the budget and stage on month-to-month terms (Directive, Bay Leaf Digital in Texas), with our own ad accounts and a 90-day exit written in.")]));
-children.push(p([b("Option B. "), r("If you would rather not fund the developer, that line ($65,000 for January to August) is borrowed elsewhere and the ask to you becomes $209,000; everything else stays the same.")]));
+children.push(p([b("Option B. "), r("If you would rather not fund the developer, that line ($65,000 for January to August) is borrowed elsewhere and the commitment from you becomes $209,000; everything else stays the same.")]));
 
 // ---- 3
 children.push(h1("3. How the investment is structured"));
 children.push(table(["Term", "Detail"], [
-  row(["You invest", "$274,000 to the company (a Texas LLC), in two tranches: about $60,000 in January 2027 and the balance at the March launch"]),
+  row(["You commit", "A $274,000 loan facility to the company (a Texas LLC). The company draws only each month's shortfall, starting January 2027; the projections draw about $238,000 on the base path and $146,000 on the optimistic, and the full amount is there if the launch runs slower"]),
   row(["Loan interest", "7% a year, accruing from the day funds are drawn"]),
   row(["Loan repayment", "Payments begin the first month the app's revenue covers its running costs (break-even), then amortise over five years"]),
   row(["Ownership", "10% membership interest in the LLC, written into the operating agreement"]),
@@ -131,11 +131,11 @@ children.push(table(["Months after the March 2027 launch", "Conservative", "Base
   row(["Cash-positive with the loan payment included", "not reached", "month 18, autumn 2028", "month 8, late 2027"], true),
 ], [3060, 2100, 2100, 2100]));
 children.push(p("", { after: 80 }));
-children.push(p([b("What the August 2027 review decides. "), r("The raise, with its contingency, carries the base case through its deepest cash need (about $178,000, including the first months of loan payments) with about $35,000 to spare and no second loan; the optimistic case needs about $92,000. The conservative case is the one money cannot fix: revenue never reaches expenses, so on that path the decision is to cut paid marketing to what the founder-led funnel supports and rethink the channel. The number to read in August is cost per paying trainer: under $900 and holding, keep going; over $1,200, stop paid spend.")]));
-children.push(p([b("What you receive. "), r("Interest of about $66,700 to $79,900 on $274,000 over the five years of payments, with the first payment in late 2027 on the optimistic path or mid 2028 on the base path, plus 10% of profit distributions once the reserve is met, plus 10% of the company's value if it is ever sold.")]));
+children.push(p([b("What the August 2027 review decides. "), r("The facility carries the base case through its deepest need, about $242,000 drawn at the peak including the first months of loan payments, with about $32,000 of headroom and no second loan; the optimistic case peaks at about $146,000. The conservative case is the one money cannot fix: revenue never reaches expenses, so on that path the decision is to cut paid marketing to what the founder-led funnel supports and rethink the channel. The number to read in August is cost per paying trainer: under $900 and holding, keep going; over $1,200, stop paid spend.")]));
+children.push(p([b("What you receive. "), r("Interest of about $32,500 to $62,000 on the money actually drawn, over the five years of payments, with the first payment in late 2027 on the optimistic path or mid 2028 on the base path, plus 10% of profit distributions once the reserve is met, plus 10% of the company's value if it is ever sold.")]));
 children.push(table(["Path", "Payments start", "Balance then, incl. accrued 7%", "Monthly payment, 5 years", "Total interest to you"], [
-  row(["Optimistic", "month 7 after launch, late 2027", "$286,500", "$5,673", "$66,700"]),
-  row(["Base", "month 14, spring 2028", "$297,700", "$5,894", "$79,900"]),
+  row(["Optimistic", "month 7 after launch, late 2027", "$145,900", "$2,890", "$32,500"]),
+  row(["Base", "month 14, spring 2028", "$238,000", "$4,710", "$62,000"]),
   row(["Conservative", "not reached; the August review changes course", "accrues", "—", "—"]),
 ], [1500, 2700, 1900, 1660, 1600], { numeric: [2, 3, 4] }));
 
@@ -184,7 +184,7 @@ children.push(h1("9. Next steps"));
 children.push(num("You review this and ask me anything."));
 children.push(num("If you are in, a lawyer drafts the loan note and the operating agreement with your 10% interest from a one-page term sheet we agree first."));
 children.push(num("I form the LLC and open the business bank account."));
-children.push(num("First tranche drawn in January 2027 when the developer and marketing lead start; second at the March web launch; review August 2027."));
+children.push(num("First draw in January 2027 when the developer and marketing lead start; draws continue month by month against the shortfall; review August 2027."));
 children.push(p("", { after: 120 }));
 children.push(p("This is a plain-language planning document, not legal or financial advice. Revenue figures are good-faith projections from published benchmarks, not guarantees. Cost figures are 2026 estimates to be confirmed with quotes. Any final agreement will be put in writing and reviewed by a lawyer before either of us signs.", { size: 19, color: GREY, italics: true }));
 
