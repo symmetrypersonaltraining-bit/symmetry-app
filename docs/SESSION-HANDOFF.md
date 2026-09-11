@@ -34,8 +34,9 @@ and do not create another one.
 > The biggest number left in the food work is keyword coverage: **68,383 rows
 > still say "1 serving"** (counted 9 Sep). Section 5, "Known gaps".
 
-Last updated: **11 Sep 2026, late night Central** · `main` = `3452718`, the
-logger's failed-tick fix (section 5), on top of the investor docs commits.
+Last updated: **11 Sep 2026, late night Central** · `main` = `ef2af5d`, the
+restaurant-plate fix, after `3452718`, the logger's failed-tick fix (both in
+section 5), on top of the investor docs commits.
 
 > 💼 **11 Sep, late: the business plan and the accounting sheet are in his
 > Drive.** Both in the folder "Symmetry Investor Package"
@@ -60,7 +61,7 @@ logger's failed-tick fix (section 5), on top of the investor docs commits.
 > Quotes for the proposal's section 8 are still the open item on the investor
 > side. Section 6 has the two Drive gotchas that cost this session two hours.
 
-**The gate is fully green**: 0 errors in `src/`, **3,080 unit tests pass 0 fail**,
+**The gate is fully green**: 0 errors in `src/`, **3,085 unit tests pass 0 fail**,
 `test-nutrition-ai.cjs` **43 passed 0 failed**, build compiles. Shipped since the
 9 Sep merges: the access rule and its switch, the two red nutrition-AI tests
 closed, the invisible meal ring and its ghost tick, **the app's own error log**
@@ -1041,6 +1042,37 @@ billing cycle. ill resume hers when she's back."*
   the paused row on Payments (a paused row does not block a new pending one —
   `uq_one_open_reminder_per_client` counts only pending/sent — so if the
   generator makes a fresh one first, delete the paused one).
+
+### ✅ SHIPPED 11 Sep — a restaurant plate is not a retail serving (`ef2af5d`, PR #38)
+
+Dustin, on his own lunch: *"Fix my lunch macros in the app. That's not even
+close."* He typed "Beef fajitas from Rivera's in Princeton Texas with flour
+tortillas and queso with ground beef" into the coach chat and it logged
+**634 kcal**. The pipeline did everything it was built to do (rows, not
+recall) and was still half the plate: fajitas → "Fully Cooked Beef Fajitas"
+packaged, 78 g, 111 kcal; queso → a frozen "Beef & Chorizo Taco Bowl",
+227 kcal. **"From Rivera's" was dropped at the first parse step**, so the pick
+and the portion question never knew it was a restaurant plate as served.
+
+- `ParsedName.context` (new, `nutrition-json.ts`): where the food came from
+  ("restaurant dish, as served at Rivera's (Tex-Mex)"), asked for per item by
+  both parsing prompts (`/nutrition-ai/act`, `/nutrition-ai/parse`).
+- `resolveFood(..., context)` hands it to the pick, the portion and the
+  estimate messages only. **The search term stays the plain food name.**
+- `PICK_SYSTEM`: a frozen meal, packaged product, seasoning or soup is not a
+  restaurant dish — answer 0 and the app looks further (USDA online → marked
+  estimate). `PORTION_SYSTEM` / `ESTIMATE_SYSTEM`: a restaurant dish is one
+  plate or bowl as served (fajita meat ≈ 170–225 g, queso bowl ≈ 170 g).
+- **His lunch row (`fdf74612…`) and the saved My Meal (`23877978…`) corrected
+  by hand** to 1,092 kcal · 69P / 69C / 60F (plate 513, two tortillas 296,
+  queso with beef 283). Backups `bak_dustin_lunch_20260911_{log,mymeal}`.
+  These are a reasoned restaurant estimate, not measured; he can adjust.
+- Three literal-string guards in `aiNeverStatesANumber.test.ts` and two shape
+  checks in `scripts/test-nutrition-ai.cjs` updated to the new item shape;
+  their intent holds. New test
+  `tests/unit/aRestaurantPlateIsNotARetailServing.test.ts`, red on all five
+  first. Unit count **3,085**. **Not yet confirmed by him on a new restaurant
+  log** — the proof is the next one he types.
 
 ### ✅ SHIPPED 11 Sep — a failed tick clears when the next one saves (`3452718`, PR #36)
 
