@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 
+import { APPEARANCE_EVENT } from "@/lib/theme/appearance";
+
 /**
  * AutoDark — follows the phone's light/dark setting. 2026-07-25.
  *
@@ -21,6 +23,10 @@ import { useEffect } from "react";
  *
  * Respects an explicit user choice via localStorage symmetry_appearance:
  *   "auto" (default) | "light" | "dark"
+ *
+ * Written by the Light / Dark / Auto toggle in Settings (2026-09-11). Before
+ * that the key was read here and written by nothing, so the app followed the
+ * phone and there was no way to override it.
  */
 export default function AutoDark() {
   useEffect(() => {
@@ -59,8 +65,22 @@ export default function AutoDark() {
         else if (pref === "light") wantDark = false;
         else wantDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
 
-        // Never re-darken a theme that is already dark.
-        if (wantDark && themeIsLight()) root.setAttribute("data-appearance", "dark");
+        const light = themeIsLight();
+
+        // Two overrides, each guarded by the SAME luminance measurement, and
+        // each only ever applied to a scheme that needs it:
+        //
+        //   dark  — wanted dark, scheme is light  → darken it
+        //   light — wanted light, scheme is dark  → lighten it  (2026-09-11)
+        //
+        // Asking for what the scheme already is sets no attribute at all. That
+        // is not a shortcut: [data-appearance="light"] derives its surfaces
+        // generically from --brand-primary, so applying it to one of the
+        // twenty-two light schemes would throw away that scheme's own palette
+        // and render all of them near-identical. The scheme is already light;
+        // leaving it alone IS light mode.
+        if (wantDark && light) root.setAttribute("data-appearance", "dark");
+        else if (!wantDark && !light) root.setAttribute("data-appearance", "light");
         else root.removeAttribute("data-appearance");
 
         // Feedback f6d884cd — "white background with white text". Tell the
@@ -73,7 +93,7 @@ export default function AutoDark() {
         // theme-name list, so it stays correct as themes are added, and it
         // covers BOTH cases the block above splits apart: a light theme being
         // overridden dark, and a theme that was dark to begin with.
-        root.style.colorScheme = wantDark || !themeIsLight() ? "dark" : "light";
+        root.style.colorScheme = wantDark ? "dark" : "light";
       } catch {
         /* an appearance tweak must never break the app */
       }
@@ -97,11 +117,16 @@ export default function AutoDark() {
       /* noop */
     }
     window.addEventListener("storage", apply);
+    // `storage` fires in every tab EXCEPT the one that wrote it, so the
+    // Settings toggle would have changed nothing on the screen you changed it
+    // on. The provider dispatches this after writing.
+    window.addEventListener(APPEARANCE_EVENT, apply);
 
     return () => {
       try { mq?.removeEventListener("change", apply); } catch { /* noop */ }
       try { obs.disconnect(); } catch { /* noop */ }
       window.removeEventListener("storage", apply);
+      window.removeEventListener(APPEARANCE_EVENT, apply);
     };
   }, []);
 
