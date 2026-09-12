@@ -3971,3 +3971,33 @@ replaced.
 
 `tests/unit/photoMealIsCorrectable.test.ts` covers all three. The remount guard
 was run against the restored wrapper and fails there.
+
+## Interlude — a restaurant is looked up, not recalled (12 Sep)
+
+Dustin: *"that ai assistant needs to search actual numbers when the restaurant
+is mentioned n needs to be able to determine the real numbers exactly the way
+you do it. Check my lunch today, once again the ai is nowhere even close. This
+cannot be released as a paid app."* Two restaurant meals in two days came out
+at roughly half: 11 Sep the Rivera's fajitas (a packaged product at a 78 g
+label serving, a frozen taco bowl for the queso), 12 Sep a **cheeseburger
+priced at 42 kcal as "1 slice"**.
+
+The 11 Sep fix carried the restaurant through to the row pick, which stopped
+the frozen-bowl class of error but could not fix the real one: **`food_catalog`
+does not contain restaurant food.** It is USDA plus grocery labels, so "which
+of these ten rows is a Rivera's fajita plate" has no right answer and every
+answer is a packaged product.
+
+| Control | Before | Now |
+|---|---|---|
+| Any "describe what you ate" path where a restaurant or brand is named | the words were matched against a grocery catalogue, then a portion question was asked about a row that was never the food | the restaurant's **published nutrition is searched and read** first — one lookup per place, not per food — and the numbers come off that page |
+| A web-sourced item | n/a | carries `source_url`, the page it was read from. **No page, no number**: an item with no source, or whose stated calories contradict its own macros by more than 15%, is discarded, not saved |
+| An item the search cannot source | n/a | returns `found: false` and falls straight through to the existing catalogue → USDA → marked-estimate chain. A bad search day degrades to the old behaviour, never to a guess |
+
+Calories are still derived by the app from the macros; the source's own calorie
+figure is used only to catch a misread page. Runs only when a place was named —
+"homemade" and a plain "6 oz chicken" never reach it. Model is Sonnet with the
+`web_search_20260209` server tool; a few calls a day against a $95 ceiling.
+
+Test: `tests/unit/aRestaurantIsLookedUpNotRecalled.test.ts` — the validator
+assertions run the real function, because "no page, no number" is the guarantee.

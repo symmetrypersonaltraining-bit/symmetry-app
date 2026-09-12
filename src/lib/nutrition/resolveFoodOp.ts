@@ -24,6 +24,7 @@ import {
 import { unitHeUses } from "@/lib/nutrition/foodUnitDefaults";
 import { readNutrients, scaleNutrients } from "@/lib/nutrition/nutrients";
 import { searchUsdaOnline, cacheUsdaFood, usdaOnlineAvailable } from "@/lib/nutrition/usdaOnline";
+import { lookupRestaurantFoods, placeFromContext, type WebFoodResult } from "@/lib/nutrition/webNutrition";
 
 /** Enough rows to contain the right one; short enough that the whole list gets read. */
 export const CANDIDATE_LIMIT = 10;
@@ -412,7 +413,73 @@ export async function priceNamedFoods(
 ): Promise<{ items: PricedItem[]; unresolved: string[] }> {
   const items: PricedItem[] = [];
   const unresolved: string[] = [];
+
+  // ── A NAMED RESTAURANT IS SEARCHED, NOT LOOKED UP IN A GROCERY CATALOGUE ───
+  //
+  // Dustin, 12 Sep: "that ai assistant needs to search actual numbers when the
+  // restaurant is mentioned n needs to be able to determine the real numbers
+  // exactly the way you do it … once again the ai is nowhere even close."
+  //
+  // food_catalog is USDA plus grocery labels. It does not contain restaurant
+  // food, so the pick below has no right answer for a Rivera's fajita plate and
+  // every answer it gives is a packaged product — which is exactly the 11 Sep
+  // failure, and the 42-kcal "1 slice" cheeseburger on 12 Sep.
+  //
+  // So when a PLACE was named, the restaurant's own published nutrition is read
+  // first. ONE lookup per place, not one per food: the page is opened once and
+  // every item on that bill is read off it. See webNutrition.ts for why this is
+  // not the model reciting macros — no page, no number.
+  //
+  // Anything it cannot source falls straight through to the catalogue chain
+  // below, so a bad search day degrades to the old behaviour rather than to a
+  // guess.
+  const byPlace = new Map<string, typeof named>();
   for (const n of named) {
+    const place = placeFromContext(n.context);
+    if (!place) continue;
+    const key = place.toLowerCase();
+    byPlace.set(key, [...(byPlace.get(key) ?? []), n]);
+  }
+  const sourced = new Map<string, WebFoodResult>();
+  for (const group of byPlace.values()) {
+    const place = placeFromContext(group[0].context) as string;
+    const found = await lookupRestaurantFoods({
+      apiKey: deps.apiKey,
+      clientId: deps.clientId,
+      place,
+      items: group.map((g) => ({ name: g.name, amount: g.amount, unit: g.unit })),
+    });
+    for (const f of found) sourced.set(f.name.trim().toLowerCase(), f);
+  }
+
+  for (const n of named) {
+    const web = sourced.get(n.name.trim().toLowerCase());
+    if (web) {
+      const r1 = (x: number) => Math.round(x * 10) / 10;
+      items.push({
+        // What the SOURCE calls it, for the same reason the catalogue path
+        // returns the row's name: a wrong match you can see beats a wrong
+        // number you cannot.
+        name: web.matched,
+        amount: null,
+        unit: web.portion,
+        p: r1(web.protein),
+        c: r1(web.carbs),
+        f: r1(web.fats),
+        // DERIVED, like every other number in this app. The source's own
+        // calorie figure was used to check these macros and then discarded.
+        kcal: Math.round(web.protein * 4 + web.carbs * 4 + web.fats * 9),
+        micros: null,
+        food_id: null,
+        verified: false,
+        // NOT an estimate. `estimated` means nobody had a row and the number is
+        // recall; this number was read off a published page, and the page is
+        // on the row.
+        estimated: false,
+        source_url: web.sourceUrl,
+      });
+      continue;
+    }
     let got: Awaited<ReturnType<typeof resolveFood>> = null;
     try {
       got = await resolveFood(deps, n.name, n.amount, n.unit, n.context ?? null);
@@ -460,4 +527,12 @@ export interface PricedItem {
   verified: boolean;
   /** True when no row existed anywhere and the last-resort estimate produced it. */
   estimated: boolean;
+  /**
+   * The published page a restaurant or branded number was read from.
+   *
+   * Null for everything that came out of food_catalog — those already trace to
+   * a row, and the row traces to USDA. This is the same receipt for the one
+   * path whose numbers do not live in this database.
+   */
+  source_url?: string | null;
 }
