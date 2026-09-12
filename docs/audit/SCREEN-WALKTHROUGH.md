@@ -3905,3 +3905,69 @@ dark side reads right.
 
 The mock-up sheet keeps all five stops so the decision can be walked back or
 nudged without rebuilding it.
+
+### The off-plan photo: three defects, one root each  ·  12 Sep 2026
+
+> *"To have AI get macros and replace a meal is not working in my app right
+> now. It takes the picture, then it goes back to the menu."*
+>
+> *"Tried using image already took, 4 slices it says 1 slice. also I can't edit
+> it, edit screen shows originals. This is the type of thing I was saying is
+> not working in here."*
+
+**1. The camera killed the sheet.** Nothing was wrong with the camera or with
+`/api/analyze-meal-photo`. The chain:
+
+1. Tapping **Snap a photo** opens the camera app, so the PWA goes hidden and
+   `RefreshOnReturn` stamps the time.
+2. Taking a picture takes well over its 3-second `MIN_AWAY_MS`.
+3. Coming back, it fires `router.refresh()` 700 ms later — which is exactly
+   what it is for, and its header promises it *"unmounts nothing"*.
+4. That promise holds **only while the component types are stable.**
+   `OffPlanSheetView` was declared *inside* `NutritionV3Client`, so every
+   render minted a new function identity; React saw a different type at that
+   position and threw the subtree away.
+5. `OffPlanFlow`'s state died with it — `mode` back to `"pick"`, the file and
+   the estimate gone, the analyze request still in flight resolving into
+   nothing. No error, no spinner. The menu.
+
+It reproduced every single time from the camera and never from **Pick a photo
+you already took**, because the gallery picker does not background the app —
+which is why his second attempt got as far as an estimate at all.
+
+The sheet is now mounted as `<OffPlanFlow>` directly from `renderSheet`, a
+module-level type that does not change between renders, and the commit logic
+moved out to `commitOffPlan` unchanged.
+
+**2. "4 slices it says 1 slice", with no way to say otherwise.** The route
+returned four totals and a paragraph of prose. The model's assumption — *"a
+standard slice (~1/12 of the 40 oz cake)"* — was buried in that paragraph and
+was **final**: with no item list, the estimate card had no per-item stepper to
+correct a count with.
+
+It now returns `items`, one per distinct food, and the prompt says the count IS
+the amount: *"1 slice", "6 wings", "2 tacos"* — never "1 serving" for something
+it counted. Four slices is now ×4 on the stepper, two taps.
+
+**3. Edit opened the meal plan's own food.** Same root. The client writes
+`item_overrides.__custom.items` from that list, and that is what makes a saved
+row kind `"custom"`. With none, the row stayed kind `"plan"`, so **Edit** opened
+`PlanAdjustSheet` seeded from the plan — Boiled Eggs, Sourdough, Egg Whites,
+Almond Butter — for a row that held a cheesecake.
+
+This is **Megan Gautreaux's 17 Aug report**, word for word: *"when I click on
+edit it pulls up the list of original meal plan, not the meal I logged with the
+picture."* It was fixed for the typed path, because `parseFoodText` already
+returned items, and the fix's own comment claims to be "the whole fix". It never
+covered the photo path, which is the path she reported it on.
+
+**The totals stay authoritative.** They are what is anchored to a chain's
+official nutrition data; the items are a breakdown *of* them, not a second
+opinion. `photoItemsFor` accepts the list only when it sums to within 10% (or
+60 kcal, whichever is larger) of the reported calories, and drops it otherwise —
+a stepper that jumps the day's total the moment it is touched is worse than no
+stepper, because the number it jumps to looks just as official as the one it
+replaced.
+
+`tests/unit/photoMealIsCorrectable.test.ts` covers all three. The remount guard
+was run against the restored wrapper and fails there.

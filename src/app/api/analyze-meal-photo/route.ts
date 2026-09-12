@@ -6,6 +6,7 @@ import { logUsage, pausedBody, assertNotPaused, checkAndLog, AiPaused, CapExceed
 import { nutrientPromptSpec, sanitizeNutrients, roundNutrients, LEGACY_NUTRIENT_KEYS } from "@/lib/nutrition/nutrients";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { SONNET_MODEL } from "@/lib/ai/anthropic";
+import { photoItemsFor } from '@/lib/nutrition/photoItems';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // Imported, not spelled out. A literal here means this route silently keeps
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest) {
         role: 'user',
         content: [
           { type: 'image', source: { type: 'base64', media_type: media as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp', data: imageBase64 } },
-          { type: 'text', text: 'Analyze this food photo and estimate the macros as accurately as possible. Use official nutrition data, not just visual estimation, whenever possible. If the photo or the accompanying text contains a receipt, packaging, a menu, or food from an identifiable restaurant or chain (for example Wing Snob, Buffalo Wild Wings, Chipotle, or anything ordered via UberEats or DoorDash), IDENTIFY THE RESTAURANT and the specific items, then base the macros on that chain\'s OFFICIAL published nutrition for those exact items and quantities rather than guessing visually. Count discrete items precisely (for example the number of wings, tenders, or slices) and multiply by the known per-item macros. Wings from wing chains are commonly OVER-estimated on calories and fat, so anchor to official per-wing values (a typical bone-in wing is about 80 to 100 kcal plain) rather than inflating. Only fall back to pure visual estimation when no brand or chain is identifiable. Respond with JSON only: { "calories": number, "protein_g": number, "carbs_g": number, "fat_g": number, "description": "what you see, including the restaurant or item and whether macros came from official data or a visual estimate", "restaurant": string or null (the identified chain/restaurant name), "source": "restaurant_official" when the macros come from a chain\'s official published nutrition, otherwise "visual_estimate", "fiber_g": number or null, "sugar_g": number or null, "sodium_mg": number or null, "sat_fat_g": number or null }. For the four nutrient fields: give a real number when the item is identifiable enough to look up (a named chain item, a packaged product, or a plain whole food), and null when it genuinely is not — a null is far more useful than a guess, because these totals are used to watch blood pressure and fiber intake. Sodium especially: restaurant and packaged food sodium is not visually estimable, so return it only from official or reference data. Additionally return a "micros" object with any OTHER micronutrients you genuinely know for this food.\n\n' + nutrientPromptSpec() + extraText }
+          { type: 'text', text: 'Analyze this food photo and estimate the macros as accurately as possible. Use official nutrition data, not just visual estimation, whenever possible. If the photo or the accompanying text contains a receipt, packaging, a menu, or food from an identifiable restaurant or chain (for example Wing Snob, Buffalo Wild Wings, Chipotle, or anything ordered via UberEats or DoorDash), IDENTIFY THE RESTAURANT and the specific items, then base the macros on that chain\'s OFFICIAL published nutrition for those exact items and quantities rather than guessing visually. Count discrete items precisely (for example the number of wings, tenders, or slices) and multiply by the known per-item macros. Wings from wing chains are commonly OVER-estimated on calories and fat, so anchor to official per-wing values (a typical bone-in wing is about 80 to 100 kcal plain) rather than inflating. Only fall back to pure visual estimation when no brand or chain is identifiable. Respond with JSON only: { "calories": number, "protein_g": number, "carbs_g": number, "fat_g": number, "items": [{ "name": string, "amount": string, "calories": number, "protein_g": number, "carbs_g": number, "fat_g": number }], "description": "what you see, including the restaurant or item and whether macros came from official data or a visual estimate", "restaurant": string or null (the identified chain/restaurant name), "source": "restaurant_official" when the macros come from a chain\'s official published nutrition, otherwise "visual_estimate", "fiber_g": number or null, "sugar_g": number or null, "sodium_mg": number or null, "sat_fat_g": number or null }. "items" IS REQUIRED AND IT IS THE MOST IMPORTANT FIELD. One entry per distinct food, each with ITS OWN macros, and the four top-level totals must be the sum of them. "amount" is the portion in words, and WHEN A FOOD COMES IN COUNTABLE PIECES THE COUNT IS THE AMOUNT — "1 slice", "6 wings", "2 tacos", "3 eggs" — never "1 serving" for something you counted. Say the number you assumed even when you are unsure of it; a person looking at the photo can correct a number they can see, and cannot correct one you only mentioned in the description. A single mixed dish that cannot be broken apart is ONE item, named as the dish. For the four nutrient fields: give a real number when the item is identifiable enough to look up (a named chain item, a packaged product, or a plain whole food), and null when it genuinely is not — a null is far more useful than a guess, because these totals are used to watch blood pressure and fiber intake. Sodium especially: restaurant and packaged food sodium is not visually estimable, so return it only from official or reference data. Additionally return a "micros" object with any OTHER micronutrients you genuinely know for this food.\n\n' + nutrientPromptSpec() + extraText }
         ]
       }]
     });
@@ -111,6 +112,13 @@ export async function POST(req: NextRequest) {
     const carbs = nutOrNull(result.carbs_g, 1);
     const fats = nutOrNull(result.fat_g ?? result.fats_g, 1);
     const description = typeof result.description === 'string' && result.description ? result.description : 'Photo meal';
+
+    // The item list, and the rule for when it is trustworthy, live in
+    // lib/nutrition/photoItems.ts where a test can run them. See that file for
+    // why a breakdown that disagrees with the total is dropped rather than
+    // shown.
+    const items = photoItemsFor(result.items, kcal);
+
     const source = result.source === 'restaurant_official' ? 'restaurant_official' : 'visual_estimate';
 
     // Nutrients, through the same helper as the macros. The model is told to
@@ -182,6 +190,7 @@ export async function POST(req: NextRequest) {
 
     // Backward-compatible payload + the structured fields for v3 callers.
     return NextResponse.json({
+      items,
       calories: kcal,
       protein_g: protein,
       carbs_g: carbs,

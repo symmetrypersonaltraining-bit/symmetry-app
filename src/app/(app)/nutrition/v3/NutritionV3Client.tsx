@@ -2461,7 +2461,42 @@ export default function NutritionV3Client(props: Props) {
   function renderSheet(s: NonNullable<SheetState>): React.ReactNode {
     switch (s.kind) {
       case "meal": return <MealSheetView rowKey={s.rowKey} />;
-      case "offplan": return <OffPlanSheetView rowKey={s.rowKey} extra={s.extra} />;
+      // MOUNTED DIRECTLY, NOT THROUGH A WRAPPER DECLARED IN THIS FUNCTION.
+      //
+      // Dustin, 12 Sep 2026: *"To have AI get macros and replace a meal is not
+      // working in my app right now. It takes the picture, then it goes back
+      // to the menu."*
+      //
+      // Nothing was wrong with the camera or with /api/analyze-meal-photo. The
+      // chain is:
+      //
+      //   1. Tapping "Snap a photo" opens the camera app, so the PWA goes
+      //      hidden and RefreshOnReturn stamps the time.
+      //   2. Taking a picture takes well over its 3s MIN_AWAY_MS.
+      //   3. Coming back, it fires router.refresh() 700ms later.
+      //   4. refresh() re-renders THIS component — which is exactly what it is
+      //      for, and its own header promises it "unmounts nothing".
+      //   5. That promise holds only while the component TYPES are stable.
+      //      `OffPlanSheetView` was declared inside this function, so every
+      //      render minted a new function identity; React saw a different type
+      //      at this position and threw the subtree away.
+      //   6. OffPlanFlow's state died with it — mode back to "pick", the file
+      //      and the estimate gone, and the analyze request still in flight
+      //      resolving into nothing. No error, no spinner: the menu.
+      //
+      // OffPlanFlow is declared at module level, so naming it here gives this
+      // position a type that does not change between renders and the sheet
+      // survives the refresh. A test holds it.
+      case "offplan": return (
+        <OffPlanFlow
+          clientId={clientId}
+          selectedDate={selectedDate}
+          title={s.extra ? "Quick log" : "Off-plan"}
+          onClose={closeAllSheets}
+          onBack={backSheet}
+          onCommit={(est) => commitOffPlan(s.rowKey, !!s.extra, est)}
+        />
+      );
       case "adjust": return <AdjustSheetView rowKey={s.rowKey} />;
       case "composer": return renderComposer(s);
       case "replace": return <ReplaceSheetView rowKey={s.rowKey} />;
@@ -2823,15 +2858,18 @@ export default function NutritionV3Client(props: Props) {
     );
   }
 
-  function OffPlanSheetView({ rowKey, extra }: { rowKey: string | null; extra?: boolean }) {
-    return (
-      <OffPlanFlow
-        clientId={clientId}
-        selectedDate={selectedDate}
-        title={extra ? "Quick log" : "Off-plan"}
-        onClose={closeAllSheets}
-        onBack={backSheet}
-        onCommit={async (est) => {
+  /**
+   * What happens when the off-plan estimate is accepted. Lifted out of the old
+   * OffPlanSheetView wrapper unchanged — see the note at the "offplan" case for
+   * why that wrapper could not keep existing.
+   */
+  async function commitOffPlan(
+    rowKey: string | null,
+    extra: boolean,
+    est: { desc: string; k: number; p: number; c: number; f: number; pending?: boolean; photoUrl?: string | null; items?: CustomItem[]; opm?: Record<string, unknown> | null },
+  ) {
+    {
+      {
           if (extra || !rowKey) {
             await addExtra(est.items ?? [{ n: est.desc, p: est.p, c: est.c, f: est.f, k: est.k, est: true }], est.desc, est.photoUrl);
             closeAllSheets();
@@ -2903,9 +2941,8 @@ export default function NutritionV3Client(props: Props) {
           });
           closeAllSheets();
           toast.success(est.pending ? "Saved — macros tonight" : "Logged off-plan ✓ — totals updated");
-        }}
-      />
-    );
+      }
+    }
   }
 
   function AdjustSheetView({ rowKey }: { rowKey: string }) {
@@ -4579,7 +4616,22 @@ function OffPlanFlow({
       // Keep the route's structured off_plan_macros (description/source/restaurant)
       // so the commit write persists exactly what the analysis produced.
       const opm = json.off_plan_macros && typeof json.off_plan_macros === "object" ? (json.off_plan_macros as Record<string, unknown>) : null;
-      setEst({ desc: json.description || "Photo meal", k: Number(json.calories) || kcalOf(p, c, f), p, c, f, opm });
+      // THE ITEMS ARE WHY THIS IS CORRECTABLE AT ALL.
+      //
+      // Dustin, 12 Sep 2026: *"4 slices it says 1 slice. also I can't edit it,
+      // edit screen shows originals."* Both were this line taking only the
+      // totals. Carried through, the estimate card draws a ×-stepper and an ✕
+      // per item — so "one slice" becomes ×4 in two taps — and the commit
+      // writes item_overrides.__custom.items, which is what makes the saved row
+      // kind "custom" so Edit opens CustomEditSheet instead of the PLAN's
+      // editor seeded from the meal plan's food.
+      //
+      // The route only sends items when they sum to within 10% of its own
+      // total, so an empty list here means "it could not break this down" and
+      // the old totals-only card is still exactly right.
+      const rawItems = Array.isArray(json.items) ? (json.items as CustomItem[]) : [];
+      const items = rawItems.length ? rawItems : undefined;
+      setEst({ desc: json.description || "Photo meal", k: Number(json.calories) || kcalOf(p, c, f), p, c, f, opm, items });
     } catch {
       setErrMsg("Network error — check your connection and try again.");
     } finally {
