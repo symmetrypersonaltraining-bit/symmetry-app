@@ -165,6 +165,7 @@ export const CLIENT_TOOLS = [
       "Use this the moment they tell you they did something that is not on their schedule. Do NOT use i_did_do_that (that is for marking a session they were ALREADY scheduled to do) and do NOT use add_my_workout (that puts a session from their library onto a day). " +
       "It lands on their calendar as a completed session, exactly like the '+ Add workout' button, and their own words are kept as the record of it. " +
       "Put what they told you in `note`, in their words — for a typed session that text IS the workout. " +
+      "It is also SAVED TO THEIR PERSONAL LIBRARY so they can log the same thing again later without describing it, which is why `movement` and `section` matter: they are what makes it findable and re-loggable rather than a one-off note. " +
       "If they did not say which day, it is today; never guess a different one. A date in the future is refused, because a session cannot already have been done on a day that has not happened.",
     input_schema: {
       type: "object" as const,
@@ -172,6 +173,17 @@ export const CLIENT_TOOLS = [
         title: { type: "string", description: "Short name for it, as they would say it: '3 Mile Hike', 'Morning Walk', 'Pickup Basketball'." },
         note: { type: "string", description: "What they told you, in THEIR words — distance, time, how it felt. This becomes the record of the session." },
         date: { type: "string", description: "YYYY-MM-DD. Defaults to today. Never in the future." },
+        movement: {
+          type: "string",
+          description:
+            "The ACTIVITY, not this instance of it: 'Hike', 'Walk', 'Run', 'Reformer Pilates', 'Basketball'. " +
+            "Never put the distance, time or date in here — 'Hike', not '3 Mile Hike' — or they collect a new movement every time they go a different distance. Defaults to the title.",
+        },
+        section: {
+          type: "string",
+          enum: ["Cardio", "Strength", "Accessory", "Warm-Up"],
+          description: "Cardio for a hike/walk/run/bike/swim; Strength for lifting; Accessory for yoga, pilates, mobility, a class or a sport. Defaults to Accessory.",
+        },
       },
       required: ["title"],
     },
@@ -760,18 +772,43 @@ export async function runClientTool(
       if (date > today) return "That date is in the future, so it can't already be done — ask them which day they mean.";
 
       const note = str("note").slice(0, 2000) || title;
+
+      // ── IT GOES IN THEIR LIBRARY, NOT JUST ON THE CALENDAR ────────────────
+      //
+      // Dustin, 13 Sep: "when ai writes a workout we tell it, app shoukd build
+      // that workout in the clients personal workout library to be used again
+      // from any path that searches workouts to log."
+      //
+      // A day with NO exercises cannot be that. /api/library-search filters on
+      // `exercise_count > 0`, and re-logging an empty day opens an empty logger
+      // — the exact failure the manual route refuses a future workout for. One
+      // real movement is what turns a note into something re-loggable.
+      //
+      // The movement is the ACTIVITY and the title is this instance of it:
+      // "Hike" as the movement, "3 Mile Hike" as the session. Collapsing those
+      // two would mint a new movement every time they walk a different
+      // distance, and their library fills with near-duplicates that never match
+      // each other in history.
+      const VALID_SECTIONS = new Set(["Cardio", "Strength", "Accessory", "Warm-Up"]);
+      const section = VALID_SECTIONS.has(str("section")) ? str("section") : "Accessory";
+      const movement = (str("movement") || title).slice(0, 120);
+
       const result = await createManualWorkout(db, clientId, {
         title,
         date,
-        exercises: [],
+        // sets 1, not the default 3: nobody does three sets of a hike, and a
+        // logger offering three is a logger that looks wrong on the way in.
+        exercises: [{ name: movement, section, sets: 1, note: null, reps: null, load: null }],
         markDone: true,
         note,
       });
       if (!result.ok) return `Couldn't log it: ${result.error}`;
 
       return (
-        `Logged — "${title}" is on ${date} as a completed session, with their own words kept on it. ` +
-        `Confirm it in one short sentence naming the session and the day. Do not list macros or mention their meal plan.`
+        `Logged — "${title}" is on ${date} as a completed session, with their own words kept on it, ` +
+        `and saved to their library as ${movement} (${section}) so they can log it again without describing it. ` +
+        `Confirm it in one short sentence naming the session and the day, and mention it is saved for next time. ` +
+        `Do not list macros or mention their meal plan.`
       );
     }
 

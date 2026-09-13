@@ -4480,3 +4480,49 @@ Both are compared against the refusal's time, so an older top-up or an earlier
 success never suppresses a newer refusal. Believing the button is safe because
 it is self-correcting: if the credit did not actually land, the next AI call
 fails and the card is back within seconds.
+
+
+### Workout search — a workout you just built can be found (13 Sep 2026)
+
+Dustin: *"when ai writes a workout we tell it, app shoukd build that workout in
+the clients personal workout library to be used again from any path that
+searches workouts to log."*
+
+Chasing that turned up something bigger than the AI paths.
+
+**`days.exercise_count` was a lie.** A plain integer column, default 0, with
+nothing maintaining it — no trigger, no generated expression, and not one line
+in `src/`. Every non-zero value was the residue of a one-off backfill, so every
+day created since at least 1 Sep read 0 however many movements it held:
+
+| workout | real exercises | stored count |
+|---|---|---|
+| Daily Mobility & Rehab — Ankle, Foot & Hip | 16 | 0 |
+| Foundations — Supervised Intro | 13 | 0 |
+| Full Body — Level 1 Day A | 11 | 0 |
+
+`/api/library-search` filters `exercise_count > 0`, so **nothing built in the
+last fortnight could be found by searching** — AI-written, trainer-written or
+swapped. `AddWorkoutButton` also printed "0 exercises" under each of them.
+
+It survived because the one screen anybody would check — the library page —
+counts properly through the `library_day_exercise_counts` RPC and looked fine
+throughout.
+
+Migration `20260913d` adds a trigger on `prescribed_exercises` that keeps the
+column true, and backfilled all 1,210 days (1,183 now searchable). Old values
+saved to `bak_days_exercise_count_20260913`.
+
+**And a session logged by the coach is now a workout, not a note.** The
+`log_a_workout_i_did` tool takes a `movement` (the activity — "Hike") and a
+`section` (Cardio / Strength / Accessory / Warm-Up) alongside the title ("3 Mile
+Hike"), and builds the day with that one movement at one set. That is what makes
+it findable by search and re-loggable later. Keeping the movement and the title
+apart is deliberate: collapsing them would mint a new movement every time
+somebody walks a different distance.
+
+> ⚠️ **Whose library it lands in depends on who logged it.** The day is created
+> with `client_owner_id` set, but the `owner_creations_are_library` trigger
+> clears that when the creator is the owner — so Dustin's own sessions become
+> library workouts, while a client's stay personal to them. Existing behaviour,
+> not changed here, but it is what "personal library" means in practice.

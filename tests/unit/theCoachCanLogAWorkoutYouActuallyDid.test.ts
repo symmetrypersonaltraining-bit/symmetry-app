@@ -71,11 +71,18 @@ describe("the coach can log a workout you actually did", () => {
   it("a session cannot already have been done on a day that has not happened", () => {
     const at = ACTIONS.indexOf('if (name === "log_a_workout_i_did")');
     assert.ok(at > -1, "the handler is missing");
-    const body = ACTIONS.slice(at, at + 1400);
+    const body = ACTIONS.slice(at, at + 2600);
     assert.match(body, /date > today/, "the future-date guard is gone");
     assert.match(body, /markDone: true/, "a session they already did is logged as completed");
-    assert.match(body, /exercises: \[\]/, "a typed session has no structured exercises — its note is the record");
   });
+
+  // The original version of the test above also asserted `exercises: []` — that
+  // a typed session carries no movements and its note is the whole record. That
+  // was true for about two hours. Dustin, the same evening: *"when ai writes a
+  // workout we tell it, app shoukd build that workout in the clients personal
+  // workout library to be used again."* An empty day cannot be that — it is
+  // filtered out of library-search and opens an empty logger. The rule that
+  // replaced it, and why, is in anAiWrittenWorkoutGoesInTheLibrary.test.ts.
 
   it("their own words are kept, because for a typed session that IS the workout", () => {
     const at = ACTIONS.indexOf('if (name === "log_a_workout_i_did")');
