@@ -707,11 +707,22 @@ server-side from the live plan, and the blanket refusal is gone. The block
 carries **no macro figures on purpose** — a number in a prompt is a number the
 model quotes back; the pricer reads them when the swap is made.
 
-**His dinner on 13 Sep is logged as the plan's Lunch meal** (`meal_id` =
+**His dinner on 12 Sep is logged as the plan's Lunch meal** (`meal_id` =
 `14d2cdbe…` on position 5), so it carries the plan's own items rather than a
 copy: 200 g chicken thigh, 200 g white rice, 2 tbsp avocado oil, free veg —
 909 kcal · 57.4P/56.3C/50.5F. `source` must be one of
 client/trainer_backfill/claude/migration; "trainer" fails the check constraint.
+
+> ⚠️ **THIS WRITE WENT TO THE WRONG DAY FIRST, AND IT IS THE RULE THAT CATCHES
+> IT.** It was written to `2026-09-13` because the session's own clock had
+> rolled over; **Central was still 12 Sep**. He opened the app, saw the
+> untouched plan dinner and said *"You didn't fix my dinner"* — the log was
+> real, it was just sitting on tomorrow where nothing renders it.
+>
+> **Before any dated write, get the date from the database, not from the
+> session:** `select (now() at time zone 'America/Chicago')::date`. CLAUDE.md
+> has said "Central time, never UTC … that has broken dated writes before"
+> since before this session, and it broke one again.
 
 ### 🔴 SHIPPED 13 Sep — EVERY AI path that produces a macro now reads it from a row (#72, #73, #74)
 
