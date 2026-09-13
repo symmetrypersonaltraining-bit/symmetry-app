@@ -717,12 +717,25 @@ scheduled job.
 
 He is turning off the desktop *Daily client rollup* himself.
 
-> ⚠️ **`ai_nutrition_log` is still empty and UNPROVEN.** The table takes writes
-> (probed and cleaned up 13 Sep), but nothing has exercised a wired surface
-> since it deployed at 02:01. Today's only AI nutrition traffic, 10:42, was the
-> plan builder — and `plan_build`, `meal_edit` and `recipe_ai` are the three
-> surfaces still NOT wired. Wire them, then confirm a real row lands. Until a
-> row exists, do not tell him the receipt trail is working.
+> ✅ **All six surfaces ARE wired — corrected 13 Sep, 11:50.** An earlier
+> version of this block said `plan_build`, `meal_edit` and `recipe_ai` were
+> still missing. They were wired by the OTHER session in **PR #84, merged
+> 11:23**, twenty minutes before that claim was written; this session read its
+> own morning note instead of `main`. `tests/unit/everyAiFoodPathLeavesAReceipt.test.ts`
+> (8 tests) now enforces that a route CALLS the logger rather than merely
+> importing it — meal-edit had exactly that dangling import — and #84 also
+> replaced the swallow-everything catch with one that reports the failure.
+>
+> ⏳ **Still unproven end-to-end: `ai_nutrition_log` has 0 rows.** That is
+> consistent, not broken — the last AI food call was 11:26:58 and #84 deployed
+> around the same minute, so nothing has run on the new build yet. **The next
+> session confirms a real row lands** (log one meal through "describe what you
+> ate" and query the table) before anyone says the receipt trail works.
+>
+> 🔁 **The lesson, and it cost a wrong answer to him twice today:** his other
+> session ships to this repo continuously. `git fetch origin main` and read the
+> CODE before reporting what is or is not built. A note written this morning is
+> not evidence about this afternoon.
 
 ### 🖥️ THE SCHEDULED JOBS ARE IN TWO PLACES, AND ONLY ONE IS VISIBLE FROM HERE
 
@@ -811,9 +824,11 @@ order by created_at desc;
 
 Written through `src/lib/ai/nutritionAudit.ts`, **fire-and-forget with every
 error swallowed** — an audit trail that can fail a meal is worse than none, and
-it is on the `uncheckedWrites` allowlist for exactly that reason. Wired into
-parse, act and photo. **`meal_edit`, `plan_build` and `recipe_ai` are NOT wired
-yet** — that is the obvious next piece.
+it is on the `uncheckedWrites` allowlist for exactly that reason. Shipped wired
+to parse, act and photo; **`meal_edit`, `plan_build` and `recipe_ai` followed in
+PR #84 the same morning, so all six surfaces are wired now** — and #84 replaced
+the swallow-everything catch with one that reports, and added a test that a
+route must CALL the logger, not merely import it.
 
 **The coach can see the plan.** He said *"Look at tomorrow thats the lunch meal
 im eating tonight for dinner"* and got *"I can only see today's meals."* True:
@@ -1612,10 +1627,10 @@ reasoning; this is what is actually left.
    `FoodSearchSheet.tsx` has no `/nutrition-ai/parse` call. *"Make sure that's
    for the drafts for all options of creating a plan with AI, not just this
    one."*
-3. **Wire `meal_edit`, `plan_build` and `recipe_ai` into `ai_nutrition_log`.**
-   The log shipped 13 Sep wired to parse, act and photo only — so the three
-   surfaces that build a WHOLE plan leave no trace, which is the opposite of
-   where the trail is worth most.
+3. ~~Wire `meal_edit`, `plan_build` and `recipe_ai` into `ai_nutrition_log`.~~
+   **DONE — PR #84, 13 Sep 11:23.** All six surfaces are wired and a test
+   enforces it. What is left is one confirmation: no row has landed yet because
+   nothing has run since that deploy. Log a meal and check the table.
 4. **Every mic: click on, click off**, app-wide. `dictation.ts` still sets
    `continuous = false`.
 5. **Draft editor round 2:** swap a food IN PLACE, rebuild one meal with AI to a
