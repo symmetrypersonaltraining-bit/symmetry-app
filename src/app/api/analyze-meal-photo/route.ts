@@ -6,6 +6,7 @@ import { logUsage, pausedBody, assertNotPaused, checkAndLog, AiPaused, CapExceed
 import { nutrientPromptSpec, sanitizeNutrients, roundNutrients, LEGACY_NUTRIENT_KEYS } from "@/lib/nutrition/nutrients";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { SONNET_MODEL } from "@/lib/ai/anthropic";
+import { textFromBlocks } from "@/lib/nutrition/webNutrition";
 import { photoItemsFor } from '@/lib/nutrition/photoItems';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -69,20 +70,52 @@ export async function POST(req: NextRequest) {
 
     const extraText = typeof text === 'string' && text.trim() ? `\n\nThe client also typed this about the meal: "${text.trim().slice(0, 500)}". Use it (e.g. restaurant name, item names, quantities) alongside the photo.` : '';
 
-    const message = await client.messages.create({
-      model: MODEL,
-      max_tokens: 3000,
-      system: 'You are a precise nutrition-estimation assistant for a physique coach. Prefer official restaurant or brand nutrition data over visual guesses, count items exactly, and avoid over-estimating calories and fat. Always respond with valid JSON only, no markdown and no prose outside the JSON.',
-      messages: [{
+    // ── IT CAN NOW ACTUALLY READ THE MENU ────────────────────────────────────
+    //
+    // This prompt has told the model to "base the macros on that chain's
+    // OFFICIAL published nutrition" since it was written — with no way to read
+    // one. The only way to obey that instruction was from memory, which is the
+    // exact failure the rest of this subsystem exists to design out, and which
+    // Dustin hit twice in two days on the typed path ("once again the ai is
+    // nowhere even close", 12 Sep). Same fix, same principle: hand it the
+    // search tool and make it name the page.
+    const tools: Anthropic.ToolUnion[] = [
+      { type: 'web_search_20260209', name: 'web_search', max_uses: 6 },
+    ];
+    const messages: Anthropic.MessageParam[] = [{
         role: 'user',
         content: [
           { type: 'image', source: { type: 'base64', media_type: media as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp', data: imageBase64 } },
-          { type: 'text', text: 'Analyze this food photo and estimate the macros as accurately as possible. Use official nutrition data, not just visual estimation, whenever possible. If the photo or the accompanying text contains a receipt, packaging, a menu, or food from an identifiable restaurant or chain (for example Wing Snob, Buffalo Wild Wings, Chipotle, or anything ordered via UberEats or DoorDash), IDENTIFY THE RESTAURANT and the specific items, then base the macros on that chain\'s OFFICIAL published nutrition for those exact items and quantities rather than guessing visually. Count discrete items precisely (for example the number of wings, tenders, or slices) and multiply by the known per-item macros. Wings from wing chains are commonly OVER-estimated on calories and fat, so anchor to official per-wing values (a typical bone-in wing is about 80 to 100 kcal plain) rather than inflating. Only fall back to pure visual estimation when no brand or chain is identifiable. Respond with JSON only: { "calories": number, "protein_g": number, "carbs_g": number, "fat_g": number, "items": [{ "name": string, "amount": string, "calories": number, "protein_g": number, "carbs_g": number, "fat_g": number }], "description": "what you see, including the restaurant or item and whether macros came from official data or a visual estimate", "restaurant": string or null (the identified chain/restaurant name), "source": "restaurant_official" when the macros come from a chain\'s official published nutrition, otherwise "visual_estimate", "fiber_g": number or null, "sugar_g": number or null, "sodium_mg": number or null, "sat_fat_g": number or null }. "items" IS REQUIRED AND IT IS THE MOST IMPORTANT FIELD. One entry per distinct food, each with ITS OWN macros, and the four top-level totals must be the sum of them. "amount" is the portion in words, and WHEN A FOOD COMES IN COUNTABLE PIECES THE COUNT IS THE AMOUNT — "1 slice", "6 wings", "2 tacos", "3 eggs" — never "1 serving" for something you counted. Say the number you assumed even when you are unsure of it; a person looking at the photo can correct a number they can see, and cannot correct one you only mentioned in the description. A single mixed dish that cannot be broken apart is ONE item, named as the dish. For the four nutrient fields: give a real number when the item is identifiable enough to look up (a named chain item, a packaged product, or a plain whole food), and null when it genuinely is not — a null is far more useful than a guess, because these totals are used to watch blood pressure and fiber intake. Sodium especially: restaurant and packaged food sodium is not visually estimable, so return it only from official or reference data. Additionally return a "micros" object with any OTHER micronutrients you genuinely know for this food.\n\n' + nutrientPromptSpec() + extraText }
+          { type: 'text', text: 'Analyze this food photo and estimate the macros as accurately as possible. Use official nutrition data, not just visual estimation, whenever possible. If the photo or the accompanying text contains a receipt, packaging, a menu, or food from an identifiable restaurant or chain (for example Wing Snob, Buffalo Wild Wings, Chipotle, or anything ordered via UberEats or DoorDash), IDENTIFY THE RESTAURANT and the specific items, then USE THE WEB SEARCH TOOL to find that chain\'s OFFICIAL published nutrition and read the macros off the page for those exact items and quantities, rather than recalling or guessing them. Restaurant portions are the plate as served, never a retail label serving. Count discrete items precisely (for example the number of wings, tenders, or slices) and multiply by the known per-item macros. Wings from wing chains are commonly OVER-estimated on calories and fat, so anchor to official per-wing values (a typical bone-in wing is about 80 to 100 kcal plain) rather than inflating. Only fall back to pure visual estimation when no brand or chain is identifiable. Respond with JSON only: { "calories": number, "protein_g": number, "carbs_g": number, "fat_g": number, "items": [{ "name": string, "amount": string, "calories": number, "protein_g": number, "carbs_g": number, "fat_g": number }], "description": "what you see, including the restaurant or item and whether macros came from official data or a visual estimate", "restaurant": string or null (the identified chain/restaurant name), "source": "restaurant_official" when the macros come from a chain\'s official published nutrition, otherwise "visual_estimate", "source_url": the page you actually read when you searched (string), or null when the numbers are a visual estimate, "fiber_g": number or null, "sugar_g": number or null, "sodium_mg": number or null, "sat_fat_g": number or null }. "items" IS REQUIRED AND IT IS THE MOST IMPORTANT FIELD. One entry per distinct food, each with ITS OWN macros, and the four top-level totals must be the sum of them. "amount" is the portion in words, and WHEN A FOOD COMES IN COUNTABLE PIECES THE COUNT IS THE AMOUNT — "1 slice", "6 wings", "2 tacos", "3 eggs" — never "1 serving" for something you counted. Say the number you assumed even when you are unsure of it; a person looking at the photo can correct a number they can see, and cannot correct one you only mentioned in the description. A single mixed dish that cannot be broken apart is ONE item, named as the dish. For the four nutrient fields: give a real number when the item is identifiable enough to look up (a named chain item, a packaged product, or a plain whole food), and null when it genuinely is not — a null is far more useful than a guess, because these totals are used to watch blood pressure and fiber intake. Sodium especially: restaurant and packaged food sodium is not visually estimable, so return it only from official or reference data. Additionally return a "micros" object with any OTHER micronutrients you genuinely know for this food.\n\n' + nutrientPromptSpec() + extraText }
         ]
-      }]
+      }];
+
+    let message = await client.messages.create({
+      model: MODEL,
+      max_tokens: 3000,
+      system: 'You are a precise nutrition assistant for a physique coach. When a restaurant, chain or packaged brand is identifiable, SEARCH THE WEB and read its published nutrition rather than recalling it; count items exactly and avoid over-estimating calories and fat. Always respond with valid JSON only, no markdown and no prose outside the JSON.',
+      tools,
+      messages,
     });
 
-    const responseText = message.content[0].type === 'text' ? message.content[0].text : '';
+    // A long search pauses the turn instead of failing. Hand it straight back
+    // once; a second pause means the search is not converging and the visual
+    // estimate is a better use of the client's waiting.
+    if (message.stop_reason === 'pause_turn') {
+      messages.push({ role: 'assistant', content: message.content });
+      message = await client.messages.create({
+        model: MODEL, max_tokens: 3000,
+        system: 'You are a precise nutrition assistant for a physique coach. When a restaurant, chain or packaged brand is identifiable, SEARCH THE WEB and read its published nutrition rather than recalling it; count items exactly and avoid over-estimating calories and fat. Always respond with valid JSON only, no markdown and no prose outside the JSON.',
+        tools,
+        messages,
+      });
+    }
+
+    // EVERY TEXT BLOCK, IN ORDER. This read `content[0]` until 12 Sep, which
+    // was correct while no tool was declared and became catastrophic the moment
+    // one was: block 0 is a server_tool_use, the JSON never parses, and every
+    // client is told "Could not read the photo".
+    const responseText = textFromBlocks(message.content);
     const result = extractJson(responseText);
 
     // Log usage regardless of parse outcome — the tokens were spent.
@@ -154,6 +187,11 @@ export async function POST(req: NextRequest) {
       source,
     };
     if (result.restaurant && typeof result.restaurant === 'string') offPlanMacros.restaurant = result.restaurant;
+    // The receipt. A number that claims to be official and cannot say which
+    // page it came from is the one thing this change exists to stop.
+    if (typeof result.source_url === 'string' && /^https?:\/\//i.test(result.source_url)) {
+      offPlanMacros.source_url = result.source_url.slice(0, 500);
+    }
 
     // ---- persist to the adherence log row (single update) when targeted ----
     let saved = false;

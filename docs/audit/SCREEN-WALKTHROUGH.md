@@ -4001,3 +4001,22 @@ figure is used only to catch a misread page. Runs only when a place was named �
 
 Test: `tests/unit/aRestaurantIsLookedUpNotRecalled.test.ts` — the validator
 assertions run the real function, because "no page, no number" is the guarantee.
+
+## Interlude — every door searches the restaurant (12 Sep, later)
+
+The web lookup shipped first on the path that had failed twice. There are two
+more doors into the same log, and both still asked a model to *recall*
+restaurant macros.
+
+| Control | Before | Now |
+|---|---|---|
+| **Photo** (`/api/analyze-meal-photo`) | the prompt already said *"base the macros on that chain's OFFICIAL published nutrition"* — **with no way to read one**. The only way to obey it was from memory | carries the same `web_search` tool: it identifies the chain, opens its nutrition page, reads the numbers off it, and records `source_url` on the row |
+| **Adjust sheet** (`/nutrition-ai/meal-edit`) — where a client fixes a meal the app got wrong | passed **no context at all**, so neither the 11 Sep restaurant handling nor the web lookup behind it ever reached it | carries `context` per item, the same field every other door uses, straight through to the resolver |
+
+**The trap that came with it:** the photo route read `message.content[0]` for its
+JSON. That is correct while no tool is declared and catastrophic the moment one
+is — block 0 becomes a `server_tool_use` and every client is told *"Could not
+read the photo"*. Text is now joined across all blocks by `textFromBlocks`, and
+a paused turn is handed back once before falling through to the visual estimate.
+
+Test: `tests/unit/everyDoorSearchesTheRestaurant.test.ts`.
