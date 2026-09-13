@@ -37,6 +37,7 @@ import { SYMMETRY_SYSTEM_PROMPT } from "@/lib/ai/system-prompt";
 import { assistantContext } from "@/lib/ai/assistantContext";
 import { runClientAssistant } from "@/lib/ai/clientAssistantRun";
 
+import { aiErrorMessage } from "@/lib/ai/aiErrors";
 import {
   loadMemory, loadRecentTurns, memoryBlock, recordTurns,
   countUnfolded, shouldFold, foldMemory,
@@ -562,7 +563,7 @@ export async function POST(req: NextRequest) {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     console.error("nutrition-ai/act failed:", msg);
-    return NextResponse.json({ error: `Coach failed — ${msg.slice(0, 120)}` }, { status: 500 });
+    return NextResponse.json({ error: aiErrorMessage(e) }, { status: 500 });
   }
 }
 

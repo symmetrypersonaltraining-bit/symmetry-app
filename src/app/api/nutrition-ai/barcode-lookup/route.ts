@@ -17,6 +17,7 @@ import type { Database, Json } from "@/lib/database.types";
 import { resolveAiScope } from "@/lib/ai/scope";
 import { mapOffProduct, OffProductJson } from "@/lib/nutrition/off";
 import { barcodeCandidates, normalizeBarcode } from "@/lib/nutrition/barcode";
+import { aiErrorMessage } from "@/lib/ai/aiErrors";
 
 const OFF_TIMEOUT_MS = 8000;
 const OFF_UA = "SymmetryPersonalTraining/1.0 (nutrition logger; symmetrypersonaltraining@gmail.com)";
@@ -99,7 +100,7 @@ export async function POST(req: NextRequest) {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     console.error("nutrition-ai/barcode-lookup failed:", msg);
-    return NextResponse.json({ error: `Lookup failed — ${msg.slice(0, 120)}` }, { status: 500 });
+    return NextResponse.json({ error: aiErrorMessage(e) }, { status: 500 });
   }
 }
 

@@ -27,6 +27,7 @@ import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveFood } from "@/lib/nutrition/resolveFoodOp";
 import { kcalOf } from "@/lib/nutrition/dailyTotals";
+import { aiErrorMessage } from "@/lib/ai/aiErrors";
 
 interface InItem { id: string; food: string; amount: number | null; unit: string | null }
 
@@ -299,6 +300,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ops, note: result.value.note });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown error";
-    return NextResponse.json({ error: `Couldn't apply that — ${msg.slice(0, 120)}` }, { status: 500 });
+    return NextResponse.json({ error: aiErrorMessage(e) }, { status: 500 });
   }
 }

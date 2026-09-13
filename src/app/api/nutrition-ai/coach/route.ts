@@ -23,6 +23,7 @@ import { logNutritionAi } from "@/lib/ai/nutritionAudit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
+import { aiErrorMessage } from "@/lib/ai/aiErrors";
 
 export async function POST(req: NextRequest) {
   try {
@@ -132,7 +133,7 @@ HARD LIMITS for this card — it sits above their food logger, not in a chat:
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     console.error("nutrition-ai/coach failed:", msg);
-    return NextResponse.json({ error: `Coach failed — ${msg.slice(0, 120)}` }, { status: 500 });
+    return NextResponse.json({ error: aiErrorMessage(e) }, { status: 500 });
   }
 }
 

@@ -46,6 +46,7 @@ import { validateVerifyResult } from "@/lib/ai/nutrition-json";
 import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
 import { nutrientPromptSpec } from "@/lib/nutrition/nutrients";
+import { aiErrorMessage } from "@/lib/ai/aiErrors";
 
 const SYSTEM_PROMPT = `You are a nutrition data auditor. You are given one food-catalog entry (name, serving info, macros) from a coaching app. Compare it against your knowledge of official nutrition labels and USDA data for that food/brand at that serving size.
 
@@ -128,7 +129,7 @@ export async function POST(req: NextRequest) {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     console.error("nutrition-ai/verify-food failed:", msg);
-    return NextResponse.json({ error: `Verify failed — ${msg.slice(0, 120)}` }, { status: 500 });
+    return NextResponse.json({ error: aiErrorMessage(e) }, { status: 500 });
   }
 }
 
