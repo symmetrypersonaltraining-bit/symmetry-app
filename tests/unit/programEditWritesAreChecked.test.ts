@@ -43,7 +43,11 @@ const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\
 const EDITOR = strip(
   readFileSync(join(process.cwd(), "src/app/(app)/clients/[clientId]/day/[dayId]/WorkoutDayEditor.tsx"), "utf8"),
 );
-const MANUAL = strip(readFileSync(join(process.cwd(), "src/app/api/workout-manual/route.ts"), "utf8"));
+// The write moved to lib/workouts/manualWorkout.ts on 13 Sep — the ✦ Coach
+// needed the same function, and a second copy of "how a typed workout is
+// stored" is how offplan_workout_logs happened. These three checks follow it;
+// the route keeps its request validation and is checked elsewhere.
+const MANUAL = strip(readFileSync(join(process.cwd(), "src/lib/workouts/manualWorkout.ts"), "utf8"));
 
 test("no field editor writes without reading the result", () => {
   // Every edit goes through saveField now. A bare update is the fault returning.

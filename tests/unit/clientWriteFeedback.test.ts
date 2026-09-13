@@ -237,8 +237,11 @@ test("a FINISHED typed session may have no structured exercises", () => {
     "the route rejects a completed free-text session again. That forces the typed " +
       "paths back onto offplan_workout_logs, which is the bug.",
   );
+  // The note is carried by the WRITE, which moved to the shared lib on 13 Sep
+  // so the ✦ Coach's log_a_workout_i_did tool could use the same one.
+  const lib = read("src/lib/workouts/manualWorkout.ts");
   assert.match(
-    route,
+    lib,
     /note: note \|\| null/,
     "the client's text is no longer carried onto the workout log. For a typed session " +
       "that text IS the workout — without it the calendar shows a bare title.",

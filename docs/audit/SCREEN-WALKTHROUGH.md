@@ -4419,3 +4419,29 @@ workout the client actually DID. Its tools move, swap, add-from-library, mark a
 SCHEDULED session complete, log a weigh-in and look up a movement — a hike is
 none of those, so no tool ran and the request fell through to the nutrition
 coach, which answered a training question it had been told to ignore.
+
+### ✦ Coach — logging a workout you actually did (13 Sep 2026)
+
+The other half of the 3-mile-hike bug. Stopping the coach claiming a write it
+did not make left it honest and still unable to do the thing.
+
+**New control (conversational):** tell the coach you did something that was not
+on your plan — *"log a 3 mile hike for my cardio today"*, a walk, a run, a
+class, a pickup game, a session at another gym — and it records it as a
+**completed session on that day**, with your own words kept as the record of it.
+
+It is the same write as the **+ Add workout** button (a client-owned day, a
+completed workout log carrying the text, and a schedule row), now shared from
+`src/lib/workouts/manualWorkout.ts` so the two can never disagree about what a
+logged session is.
+
+**What it will not do:** log a session dated in the future — a session cannot
+already have been done on a day that has not happened, and the refusal says so.
+
+**Which tool for which case**, because picking the wrong one is the next bug:
+
+| They say | Tool |
+|---|---|
+| "I did a hike" — not on the plan | `log_a_workout_i_did` |
+| "I DID do Friday's session" — it was scheduled, app says missed | `i_did_do_that` |
+| "Add another walk on Saturday" — from their library | `add_my_workout` |
