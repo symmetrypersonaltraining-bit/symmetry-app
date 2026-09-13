@@ -693,6 +693,37 @@ Removed with it: the table's entry in the trainer agent's `READABLE` and
 > table` needs `drop view jarvis.<name>` first — and a dependency check that
 > filters by view NAME will miss it, because the view is named after the table.
 
+### 🧾 13 Sep — the nightly meal estimator is GONE; the workout roll-up is on the AI audit list
+
+Dustin: *"keep the workout rollup but put that in the ai audit list so we can
+build the ai within the app and ge trid of that one. get rid of meal plan on
+enow ill go turn off scheduled task."*
+
+**Routine `trig_01Q1BxfHbPrnwRL3TbVYmUnE`** (3am Central) is rewritten, not
+deleted. Its PART 2 — read `off_plan_details`, estimate the macros *"like a
+knowledgeable coach"*, write `est_kcal/est_protein/est_carbs/est_fats` — is
+removed, and the prompt now carries a paragraph saying why and forbidding its
+return under another name. It was both against the AI contract and redundant:
+the app prices off-plan meals at log time, 99 of 99 September rows, all
+`macros_pending = false`.
+
+Its PART 1, rolling a typed "Add workout" into the client's library, KEEPS
+RUNNING — without it a workout a client logged never reaches their history.
+It is now written up as an AI component in **`docs/audit/AI-COMPONENTS.md`**,
+in the new section *"AI that runs outside the app"*, with its reads/decides/
+writes/when/model and its failures against the bar. **Build it into the app,
+then delete the Routine.** That section also holds the verdict on every other
+scheduled job.
+
+He is turning off the desktop *Daily client rollup* himself.
+
+> ⚠️ **`ai_nutrition_log` is still empty and UNPROVEN.** The table takes writes
+> (probed and cleaned up 13 Sep), but nothing has exercised a wired surface
+> since it deployed at 02:01. Today's only AI nutrition traffic, 10:42, was the
+> plan builder — and `plan_build`, `meal_edit` and `recipe_ai` are the three
+> surfaces still NOT wired. Wire them, then confirm a real row lands. Until a
+> row exists, do not tell him the receipt trail is working.
+
 ### 🖥️ THE SCHEDULED JOBS ARE IN TWO PLACES, AND ONLY ONE IS VISIBLE FROM HERE
 
 This cost a wrong answer on 13 Sep. Asked what the "Daily client rollup" was,
