@@ -83,6 +83,31 @@ export async function GET() {
       .limit(1);
     const last = failRows?.[0];
 
+    // ── WHAT DISPROVES THAT REFUSAL ─────────────────────────────────────────
+    //
+    // Dustin, 5:33pm: "I added but the notification won't clear." Until now the
+    // only thing that cleared an outage was the refusal ageing out over six
+    // hours, so the "I added credit — record it" button wrote a row nothing
+    // read and the red banner sat there telling him to fix what he had fixed.
+    //
+    // A call that SUCCEEDED since is proof the key works; a top-up recorded
+    // since is his own statement that he has dealt with it. See creditHealth.ts
+    // for why believing him is safe — if he is wrong the next call fails and
+    // the banner is back immediately.
+    const { data: okRows } = await db
+      .from("ai_usage_log")
+      .select("created_at")
+      .or("error.is.null,error.eq.")
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    const { data: lastTopUpRows } = await (db as unknown as UntypedTable)
+      .from("ai_credit_topups")
+      .select("created_at")
+      .order("created_at", { ascending: false })
+      .limit(1);
+    const lastTopUpAt = (lastTopUpRows?.[0]?.created_at as string | undefined) ?? null;
+
     const days = Math.max(
       1,
       Math.round((Date.now() - Date.parse(`${since}T00:00:00Z`)) / 86400000),
@@ -96,6 +121,8 @@ export async function GET() {
         lastFailure: last
           ? { at: String(last.created_at), feature: last.feature ?? null, error: last.error ?? null }
           : null,
+        lastSuccessAt: okRows?.[0]?.created_at ? String(okRows[0].created_at) : null,
+        lastTopUpAt,
       }),
       since,
     });
