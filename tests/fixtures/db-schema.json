@@ -43,7 +43,6 @@
     "turn_count",
     "updated_at"
   ],
-  "ai_nutrition_log": ["id", "client_id", "surface", "request_text", "model", "intent", "items", "unresolved", "totals", "any_estimated", "any_unresolved", "created_at"],
   "ai_corrections": [
     "id",
     "client_id",
@@ -58,6 +57,14 @@
     "source",
     "created_at"
   ],
+  "ai_credit_topups": [
+    "id",
+    "amount_usd",
+    "added_on",
+    "note",
+    "added_by",
+    "created_at"
+  ],
   "ai_nudge_log": [
     "id",
     "client_id",
@@ -66,6 +73,20 @@
     "body",
     "sent",
     "suppressed",
+    "created_at"
+  ],
+  "ai_nutrition_log": [
+    "id",
+    "client_id",
+    "surface",
+    "request_text",
+    "model",
+    "intent",
+    "items",
+    "unresolved",
+    "totals",
+    "any_estimated",
+    "any_unresolved",
     "created_at"
   ],
   "ai_program_drafts": [
@@ -122,6 +143,23 @@
     "value",
     "note",
     "updated_at"
+  ],
+  "app_error_log": [
+    "id",
+    "client_id",
+    "user_id",
+    "scope",
+    "message",
+    "detail",
+    "path",
+    "user_agent",
+    "created_at",
+    "fingerprint",
+    "occurrences",
+    "last_seen_at",
+    "source",
+    "recent",
+    "resolved_at"
   ],
   "app_feedback": [
     "id",
@@ -348,23 +386,6 @@
     "compensation_confidence",
     "movement_assessment_id",
     "created_by_trainer_id"
-  ],
-  "app_error_log": [
-    "id",
-    "client_id",
-    "user_id",
-    "scope",
-    "message",
-    "detail",
-    "path",
-    "user_agent",
-    "created_at",
-    "fingerprint",
-    "occurrences",
-    "last_seen_at",
-    "source",
-    "recent",
-    "resolved_at"
   ],
   "client_goals": [
     "id",
