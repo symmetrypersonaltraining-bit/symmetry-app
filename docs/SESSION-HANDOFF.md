@@ -1498,6 +1498,55 @@ Accept; back from Recipes on his phone; the Light/Dark toggle. Also confirmed
 earlier the same day: recommend-my-targets, the consult asking for a deleted
 height, plan versions, and Trends being gone.
 
+### 🟡 THE LIST — REFRESHED 13 Sep, CHECKED AGAINST THE CODE
+
+Everything below was verified against `main` at `3077f90` rather than copied
+forward. The 12 Sep list is kept underneath because its reasoning is still the
+reasoning; this is what is actually left.
+
+**WAITING ON HIM — nothing can close these but him tapping.**
+
+| | what | why it is here |
+|---|---|---|
+| **A** | **Retest the off-plan photo** (PR #68, shipped 12 Sep, never confirmed). From the CAMERA, not the gallery: the sheet should stay put; the estimate should list items with counts and steppers; then Edit the saved row and see what he logged, not the plan's food. | Three defects fixed, none confirmed |
+| **B** | **Batch 2 of the Nutrition walk.** Batches 1 and 1b are done. | The audit's own next step |
+| **C** | **Per-meal ⋯ and Edit** (inventory #31/#32) — needs a saved plan on Test Client first. | Deferred by him on 11 Sep |
+| **D** | **The AI-principle decision** — the table below. He asked for the assessment, got it, and has not said go. | *"see if that's worth doing or not"* |
+
+**BUILD — in his order, all verified still open.**
+
+1. **maxTokens.** `plan-build/route.ts:224` **is still `8000`** while replies run
+   6,776-8,686 tokens. Called *"first thing tomorrow"* on 11 Sep and it has now
+   been passed over twice while the restaurant and pricing work took priority.
+   It is the reason drafts come off the salvage path.
+2. **AI-parse a food when adding to a draft.** Confirmed absent —
+   `FoodSearchSheet.tsx` has no `/nutrition-ai/parse` call. *"Make sure that's
+   for the drafts for all options of creating a plan with AI, not just this
+   one."*
+3. **Wire `meal_edit`, `plan_build` and `recipe_ai` into `ai_nutrition_log`.**
+   The log shipped 13 Sep wired to parse, act and photo only — so the three
+   surfaces that build a WHOLE plan leave no trace, which is the opposite of
+   where the trail is worth most.
+4. **Every mic: click on, click off**, app-wide. `dictation.ts` still sets
+   `continuous = false`.
+5. **Draft editor round 2:** swap a food IN PLACE, rebuild one meal with AI to a
+   per-meal target, reorder meals, before/after delta.
+6. **The plan builder inventing macros is FIXED** (#72, `repriceDraft.ts`) — the
+   old item 6 is closed. What is left of it: `set_macro_targets` and the
+   weekly/brief prose were **left model-stated on purpose**; see the #72/#73/#74
+   entry before touching either.
+7. **A library-vs-custom switch** for the builders — his design ask, not built.
+8. **The rest of the walk** — Batches 3-6 unwalked.
+9. **The messages notification split** — mock-up only, not started.
+10. **Test Client's `ai_daily_plan_build_limit` back to 3/day.** Currently 200.
+    Routine `trig_01EcEWnV4eU36KP2xKczDpes` carries it.
+
+**Closed since the 12 Sep list was written:** the restaurant lookup (#69, #70),
+every AI macro path reading from a row (#72, #73, #74), the audit log and the
+coach seeing the plan (#76), the two home cards (#79), and the off-plan photo's
+three defects (#68, awaiting his retest).
+
+
 ### TOMORROW'S LIST — 12 SEP, IN HIS ORDER
 
 He asked for this explicitly, at the end of a long night: *"I want a full list

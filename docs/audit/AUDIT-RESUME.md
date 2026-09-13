@@ -127,15 +127,27 @@ are NOT bugs and must stop being re-reported.
 
 ### Next — in this order
 
-1. **Screen 3 — NUTRITION.** 🔵 **THE WALK IS OPEN. RESUME AT: his answers to
-   the three questions, then Batch 1.**
+1. **Screen 3 — NUTRITION.** 🔵 **THE WALK IS OPEN. RESUME AT: BATCH 2.**
 
-   **Exactly where it stopped (9 Sep, evening).** The three opening questions
-   were put to him — what the screen is *for*, what he never looks at, what he
-   expects to be wrong — and he went out before answering: *"we will pick up
-   here tomorrow im out for the night"*. **Nothing has been tapped, nothing
-   recorded, not one row filled in.** So the next session re-asks those three,
-   waits for him, then puts Batch 1's six controls to him.
+   **Exactly where it stands (13 Sep).** The three opening questions are
+   **answered** and written up, and **Batch 1 and Batch 1b are walked** — his
+   verdicts, in his words, are in `SCREEN-WALKTHROUGH.md`. Everything they threw
+   off has shipped and **he has confirmed it on the live app**: the 14-day
+   average counting unlogged days, the in-app back button, the AI draft being
+   editable, macros and calories following each other, TDEE computed in code,
+   the consult asking for what it is missing, plan versions, Trends retired, the
+   draft's actual-vs-target boxes, the percentage split blocking Accept, the
+   Light/Dark toggle, and the strongest background.
+
+   **So do NOT re-ask the three questions and do NOT re-walk Batch 1.** The next
+   thing that needs him is **Batch 2**, and the two things carried over from
+   Batch 4 — the per-meal ⋯ menu and the Edit button (#31/#32) — which need a
+   saved plan on Test Client before they can be tapped.
+
+   The earlier version of this entry said "nothing has been tapped, nothing
+   recorded" and was two days stale by the time anyone read it. If you are
+   resuming, `docs/SESSION-HANDOFF.md` §5 and the end of `SCREEN-WALKTHROUGH.md`
+   are the live state; this file points at them rather than restating them.
 
    The format is shipped, adherence is rebuilt, the food brain now goes online,
    and **the control inventory is DONE** — six batches at the end of
