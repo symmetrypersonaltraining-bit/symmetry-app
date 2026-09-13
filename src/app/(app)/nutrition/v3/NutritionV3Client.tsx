@@ -33,6 +33,7 @@ import { planTargetDrift } from "@/lib/ai/nutrition-json";
 import TargetEditor from "@/components/nutrition/TargetEditor";
 import { fromGrams, type MacroTargets } from "@/lib/nutrition/macroSplit";
 import { MISSING_LABEL, type MissingInput } from "@/lib/nutrition/expenditure";
+import { clearOffPlanDraft, readOffPlanDraft, saveOffPlanDraft } from "@/lib/nutrition/offPlanDraft";
 import {
   addItemTo, keyDraft, patchItemAt, patchMealAt, removeItemAt, removeMealAt,
   scaleItemTo, setDraftTargets,
@@ -4553,6 +4554,29 @@ function OffPlanFlow({
   onBack?: () => void;
 }) {
   const supabase = useMemo(() => createClient(), []);
+  /**
+   * THE CAMERA CAN TAKE THE WHOLE PAGE WITH IT, SO THE WORK OUTLIVES THE PAGE.
+   *
+   * Dustin, 13 Sep, after the 12 Sep fix: *"off plan photo still drops off."*
+   *
+   * That fix stopped the sheet being torn down by `router.refresh()` — a real
+   * cause, and it is still fixed — but it assumed the React tree survives the
+   * camera. On Android it often does not: the OS reclaims the WebView while the
+   * camera app is in front, and the PWA is RELOADED on return. No amount of
+   * component-identity care survives a reload, because there is no component
+   * left. Nor a Capacitor shell restart, nor a crash, nor the app being swiped
+   * away mid-analysis.
+   *
+   * So the flow's state is mirrored into sessionStorage and read back on mount.
+   * Whatever killed the page, the sheet comes back where it was: the mode, the
+   * typed text, the estimate with its items, and the photo — as the compressed
+   * data URL, which is what the preview needs and what the analysis already
+   * turned into base64 anyway.
+   *
+   * sessionStorage rather than local: this is work in progress, not a
+   * preference, and it should not still be sitting there tomorrow. It is
+   * cleared the moment the estimate is committed or the sheet is closed.
+   */
   const [mode, setMode] = useState<"pick" | "photo" | "typed">("pick");
   const [busy, setBusy] = useState(false);
   const [est, setEst] = useState<{ desc: string; k: number; p: number; c: number; f: number; items?: CustomItem[]; opm?: Record<string, unknown> | null } | null>(null);
@@ -4568,6 +4592,29 @@ function OffPlanFlow({
   // A recogniser left running when the sheet closes holds Android's single
   // recogniser slot, and the next mic anywhere in the app then fails to start.
   useEffect(() => () => { try { micRef.current?.stop?.(); } catch { /* noop */ } }, []);
+
+  // The photo as a data URL, which is what survives a reload — a File does not.
+  const [photoData, setPhotoData] = useState<string | null>(null);
+  const restored = useRef(false);
+
+  // READ BACK FIRST, BEFORE ANYTHING CAN OVERWRITE IT.
+  useEffect(() => {
+    const d = readOffPlanDraft();
+    restored.current = true;
+    if (!d) return;
+    setMode(d.mode);
+    setText(d.text);
+    if (d.photo) { setPhotoData(d.photo); setPhotoPreview(d.photo); }
+    if (d.est) setEst(d.est as typeof est);
+  }, []);
+
+  // And mirror every change back out. Guarded on `restored` so the first render
+  // — which still has the empty initial state — cannot wipe the draft it is
+  // about to read.
+  useEffect(() => {
+    if (!restored.current) return;
+    saveOffPlanDraft({ mode, text, photo: photoData, est });
+  }, [mode, text, photoData, est]);
 
   // VOICE LOGGING WAS DEAD ON THE REAL APP.
   //
@@ -4607,6 +4654,10 @@ function OffPlanFlow({
     setEst(null);
     try {
       const { base64 } = await compressPhoto(file);
+      // Kept so the sheet can be rebuilt without the File, which does not
+      // survive a reload. Set BEFORE the request, so a page killed mid-analysis
+      // still comes back showing the photo rather than an empty sheet.
+      setPhotoData(`data:image/jpeg;base64,${base64}`);
       // clientId scopes the per-client AI meter server-side; any typed text
       // rides along as extra context (restaurant names, quantities, ...).
       const res = await fetch("/api/analyze-meal-photo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageBase64: base64, mimeType: "image/jpeg", clientId, text: text.trim() || undefined }) });
@@ -4683,16 +4734,25 @@ function OffPlanFlow({
     setSaving(true);
     try {
       let photoUrl: string | null = null;
-      if (photoFile) {
+      // A restored draft has no File — the page it was picked in is gone — but
+      // it has the compressed data URL, which turns back into the same blob.
+      const blobFor = async (): Promise<Blob | null> => {
+        if (photoFile) return (await compressPhoto(photoFile)).blob;
+        if (photoData) { try { return await (await fetch(photoData)).blob(); } catch { return null; } }
+        return null;
+      };
+      if (photoFile || photoData) {
         try {
-          const { blob } = await compressPhoto(photoFile);
+          const blob = await blobFor();
+          if (!blob) throw new Error("no photo to upload");
           const path = `${clientId}/${selectedDate}-v3-${Date.now()}.jpg`;
           const { error: upErr } = await supabase.storage.from("meal-photos").upload(path, blob, { contentType: "image/jpeg", upsert: true });
           if (!upErr) photoUrl = supabase.storage.from("meal-photos").getPublicUrl(path).data.publicUrl || null;
         } catch { /* keep going without the photo */ }
       }
       if (pending) {
-        await onCommit({ desc: text.trim() || "Off-plan meal", k: 0, p: 0, c: 0, f: 0, pending: true, photoUrl });
+        clearOffPlanDraft();
+      await onCommit({ desc: text.trim() || "Off-plan meal", k: 0, p: 0, c: 0, f: 0, pending: true, photoUrl });
       } else if (est) {
         await onCommit({ ...est, photoUrl });
       }
@@ -4710,7 +4770,13 @@ function OffPlanFlow({
   );
 
   return (
-    <Sheet title={title} subtitle="AI estimates macros instantly · trainer can override" onClose={onClose} onBack={mode === "pick" ? onBack : () => { setMode("pick"); setEst(null); setErrMsg(null); }}>
+    <Sheet title={title} subtitle="AI estimates macros instantly · trainer can override"
+      // Closing is abandoning it. A draft that outlives the sheet would offer
+      // to log this meal again the next time the sheet is opened.
+      onClose={() => { clearOffPlanDraft(); onClose(); }}
+      onBack={mode === "pick"
+        ? () => { clearOffPlanDraft(); onBack?.(); }
+        : () => { setMode("pick"); setEst(null); setErrMsg(null); setPhotoData(null); setPhotoPreview(null); setPhotoFile(null); }}>
       {mode === "pick" && (
         <>
           {rowBtn("📷", "Snap a photo", "Restaurant & receipt aware — detects chains for official data", () => fileRef.current?.click())}

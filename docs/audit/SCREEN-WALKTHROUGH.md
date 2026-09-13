@@ -4148,3 +4148,87 @@ old at 8:37, and it really had synced 687 sessions. The card was reporting the
 last *scheduled* run correctly; it simply had no way to learn about a manual one.
 
 Test: `tests/unit/aCardThatComplainsGivesYouTheButton.test.ts`.
+
+### A recommended plan has to BE the recommendation  ·  13 Sep 2026
+
+> *"If I'm creating a meal plan with suggested numbers should the draft be set
+> at the actual number? This is common sense shit again — why would I ask for a
+> recommendation then have it spit out a 5k calorie meal plan at me? The idea is
+> the AI creates the meal plan based on set numbers, then I can fine tune the
+> numbers, not suggest 2k calories then give me a plan 2.5x that."*
+
+His consult draft recommended **1,703 kcal · 144P / 147C / 60F** and handed him
+a plan coming to **5,689 kcal · 145P / 182C / 487F**.
+
+`plan-build` measured that miss, stamped `targetsMet: false`, and **returned
+the plan anyway** — a red badge on something nobody could use. Measuring is not
+fixing.
+
+**The shape of the miss names the cause.** Protein 145 against 144 is exact.
+Carbs 182 against 147 is ordinary drift. Fat **487 against 60** is not drift at
+all. A plan with every amount inflated would be over on all three; being perfect
+on one and out by 712% on another is **one item carrying an impossible amount** —
+an oil or a nut butter with a slipped decimal.
+
+That kind of typo used to hide. Before `repriceDraft` (#72) the model supplied
+the macros too, so it stated plausible ones for the plan it thought it had
+written. Now every number is read from a real row, so a 450 g amount is
+faithfully priced at 450 g and the error surfaces in full. **Pricing honestly is
+right; handing the result over unchecked is not.**
+
+`src/lib/nutrition/fitPlanToTargets.ts`, in this order:
+
+1. **Drop the slipped decimal.** A single food supplying more calories than the
+   client's entire day is not a portion. Scaling first would keep it — just
+   smaller — and starve every other food to make room for it. The dropped food
+   is named, and rides back with `unpriced` so it is never silent.
+2. **Then scale what is left onto the target.** Scaling an amount and its macros
+   by the same factor keeps every number row-derived — 100 g of banana at 99
+   kcal is 50 g at 49.5 — so this does not reopen the door #72 closed. It is the
+   same rule he already approved for the calorie box in `macroSplit`: *same
+   diet, less of it.* Amounts round to something a person can actually serve, so
+   3 rice cakes never become 2.4.
+
+**The first version of the absurd-item rule was wrong and the tests caught it.**
+It used a share of the target — 55% — which dropped a 311 kcal chicken breast
+from a 311 kcal plan, and a banana. A fraction cannot tell a large portion from
+an impossible one. "More calories than the whole day" can, and it has no false
+positives in any real plan.
+
+**What this does NOT do, stated plainly:** one scale factor cannot hit four
+numbers. The calories land; protein, carbs and fat move by that same factor, so
+a plan whose *split* was wrong stays wrong in proportion. That is a long way
+from 5,689 against 1,703, and the per-box "145 of 144g" lines show exactly what
+is left for him to fine-tune — which is the workflow he described. Fitting all
+four would mean solving per item rather than per plan; worth doing, not worth
+pretending this does it.
+
+### The off-plan photo, second attempt  ·  13 Sep 2026
+
+> *"Off plan photo still drops off."*
+
+The 12 Sep fix stopped `router.refresh()` tearing the sheet down. That was a
+real cause and it is still fixed. What it **assumed** is that the React tree
+survives the camera at all — and on Android it frequently does not: the OS
+reclaims the WebView while the camera app is in front, and the PWA is **reloaded**
+on return. There is no component identity to preserve when there is no
+component. The same is true of a Capacitor shell restart, a crash, or the app
+being swiped away mid-analysis.
+
+So the sheet's work now lives outside React, in
+`src/lib/nutrition/offPlanDraft.ts`: the mode, the typed text, the estimate with
+its items, and the photo as its compressed data URL — which is what the preview
+needs to redraw and what the analysis already produced anyway. Whatever killed
+the page, the sheet comes back where it was.
+
+- **The photo is stored BEFORE the request**, because the page is likeliest to
+  die during it. Coming back to the photo and a retry beats an empty sheet.
+- **A restored draft has no `File`** — the page it was picked in is gone — so
+  the commit turns the data URL back into the same blob to upload.
+- **sessionStorage, not local.** This is work in progress, not a preference: it
+  should survive the camera and it should not still be sitting there tomorrow
+  offering to log yesterday's snack. Thirty-minute TTL, cleared the moment the
+  estimate is committed or the sheet is closed.
+- **Every read and write is wrapped.** A private window, a full quota or a photo
+  too large to stringify must never break logging a meal — failing to save the
+  draft costs exactly what the app did before this file existed.
