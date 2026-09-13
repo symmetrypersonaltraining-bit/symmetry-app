@@ -68,7 +68,9 @@ const ALLOWED: Record<string, { max: number; why: string }> = {
   // ── The sweep cannot see through a ternary. Both of these ARE checked:
   //    the result is assigned and the error inspected on the following lines.
   "src/app/(app)/schedule/scheduleActions.ts": { max: 2, why: "checked via a ternary the regex cannot follow" },
-  "src/app/api/workout-manual/route.ts": { max: 1, why: "checked via a ternary the regex cannot follow" },
+  // Moved 13 Sep with the code: the write left the route for lib/workouts/manualWorkout.ts
+  // when the ✦ Coach needed the same function. Same line, same ternary, new home.
+  "src/lib/workouts/manualWorkout.ts": { max: 1, why: "checked via a ternary the regex cannot follow" },
 };
 
 interface Site { file: string; line: number; op: string; table: string }

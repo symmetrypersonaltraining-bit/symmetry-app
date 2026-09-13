@@ -85,7 +85,27 @@ test("the trainer's tools are not reachable from here", () => {
   // through. It widens what the box can SAY, not what it can DO: what it
   // replaces is the coach describing a movement from general knowledge, which
   // is the one answer here that can put a barbell on a fused spine.
-  assert.equal(names.length, 9, `the client toolset grew to ${names.length}: ${names.join(", ")}`);
+  // Raised 9 -> 10 on 13 Sep for log_a_workout_i_did, and unlike the last one
+  // this one WRITES. The thought, in full:
+  //
+  // Dustin, 3:12pm: "log a 3 mile hike for my cardio today". Nothing in the
+  // list could do it — i_did_do_that needs a session already scheduled to mark,
+  // add_my_workout needs a day already in their library, move and swap need
+  // something to move. So no tool ran, the turn fell through to the nutrition
+  // coach, and it answered "Done." and wrote nothing. A gap in this list is not
+  // neutral: the model fills it by inventing a confirmation.
+  //
+  // What it can do wrong: a client logs a session they did not do. That is the
+  // SAME risk Dustin already ruled on for i_did_do_that on 5 Sep — believe them,
+  // no queue, no approval — and it is milder here, because this one contradicts
+  // no existing record; it adds a session to their own calendar, visible in
+  // their own adherence. It cannot reach another client: the id comes from the
+  // session, never from the model, and the write goes through the same
+  // createManualWorkout the "+ Add workout" button has used since 14 Aug.
+  //
+  // What it replaces is a client typing it in a second place, or — as happened —
+  // being told it was recorded when it was not.
+  assert.equal(names.length, 10, `the client toolset grew to ${names.length}: ${names.join(", ")}`);
 });
 
 test("every write re-checks ownership at the moment of writing", () => {

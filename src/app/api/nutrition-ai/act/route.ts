@@ -372,6 +372,20 @@ export async function POST(req: NextRequest) {
           `weigh-in, or ANY question that names a MOVEMENT. If they are asking about food, meals, macros ` +
           `or their plan, answer nothing here and call no tool: a different part of the coach handles ` +
           `nutrition and will answer them properly.` +
+          // ── ITEM F, and the same trap as Item E below. ────────────────────
+          //
+          // The sentence above lists QUESTIONS. A client reporting a session is
+          // not asking anything, so "log a 3 mile hike for my cardio today"
+          // matched none of it, no tool ran, and the request fell through to
+          // the nutrition coach — which told him "Done." and wrote nothing.
+          // Adding log_a_workout_i_did to the toolset without widening this
+          // would have left that path exactly as it was.
+          `\n\nTELLING YOU THEY DID SOMETHING IS A TOOL CALL, NOT A CHAT REPLY. A hike, a walk, a run, ` +
+          `a class, a pickup game, a session at another gym — anything they did that is not on their plan ` +
+          `goes to log_a_workout_i_did, called BEFORE you say anything about it. If it WAS on their plan ` +
+          `and the app has it as not done, that is i_did_do_that instead. Never confirm a session in words ` +
+          `without calling one of them: a client who is told it was logged stops checking, and an entry ` +
+          `that was never written is worse than one they had to type themselves.` +
           // ── ITEM E, and the reason the tool alone was not enough. ─────────
           //
           // The line above used to end at "logging a weigh-in", and a movement

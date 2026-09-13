@@ -42,6 +42,7 @@
 import type { Db } from "@/lib/ai/scope";
 import { isDayInPool, clearedPoolFor } from "@/lib/ai/workoutPool";
 import { lookUpMovements } from "@/lib/ai/movementContext";
+import { createManualWorkout } from "@/lib/workouts/manualWorkout";
 
 export const CLIENT_TOOLS = [
   {
@@ -144,6 +145,35 @@ export const CLIENT_TOOLS = [
         their_words: { type: "string", description: "What they told you, in THEIR words." },
       },
       required: ["scheduled_workout_id"],
+    },
+  },
+  {
+    // ── A WORKOUT THEY ACTUALLY DID, THAT WAS NEVER ON THE PLAN ───────────
+    //
+    // Dustin, 13 Sep, 3:12pm: "log a 3 mile hike for my cardio today". The
+    // coach said "On it — logging a 3-mile hike for your cardio today. Done."
+    // and wrote nothing, because nothing in this list could do it. i_did_do_that
+    // needs a SCHEDULED session to mark; add_my_workout needs a day already in
+    // their library. A hike on a rest day is neither, and it is the single most
+    // ordinary thing a client reports.
+    //
+    // The "+ Add workout" button has done exactly this since 14 Aug. This is
+    // the same write, through the same function.
+    name: "log_a_workout_i_did",
+    description:
+      "Record a session the client ALREADY DID that was not on their plan — a hike, a walk, a run, a pickup game, a class, a session at another gym. " +
+      "Use this the moment they tell you they did something that is not on their schedule. Do NOT use i_did_do_that (that is for marking a session they were ALREADY scheduled to do) and do NOT use add_my_workout (that puts a session from their library onto a day). " +
+      "It lands on their calendar as a completed session, exactly like the '+ Add workout' button, and their own words are kept as the record of it. " +
+      "Put what they told you in `note`, in their words — for a typed session that text IS the workout. " +
+      "If they did not say which day, it is today; never guess a different one. A date in the future is refused, because a session cannot already have been done on a day that has not happened.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        title: { type: "string", description: "Short name for it, as they would say it: '3 Mile Hike', 'Morning Walk', 'Pickup Basketball'." },
+        note: { type: "string", description: "What they told you, in THEIR words — distance, time, how it felt. This becomes the record of the session." },
+        date: { type: "string", description: "YYYY-MM-DD. Defaults to today. Never in the future." },
+      },
+      required: ["title"],
     },
   },
   {
@@ -718,6 +748,30 @@ export async function runClientTool(
       return (
         `Done — ${label} on ${row.scheduled_date} is now marked ${done ? "completed" : "not done"} (was ${was}). ` +
         `Tell them what you had wrong and what it says now, in one short sentence each. No apology paragraph.`
+      );
+    }
+
+    if (name === "log_a_workout_i_did") {
+      const title = str("title").slice(0, 120);
+      if (!title) return "Error: need a short name for the session — ask them what to call it.";
+      const date = ISO.test(str("date")) ? str("date") : today;
+      // The same rule the route enforces on the server, for the same reason: a
+      // session cannot already have been done on a day that has not happened.
+      if (date > today) return "That date is in the future, so it can't already be done — ask them which day they mean.";
+
+      const note = str("note").slice(0, 2000) || title;
+      const result = await createManualWorkout(db, clientId, {
+        title,
+        date,
+        exercises: [],
+        markDone: true,
+        note,
+      });
+      if (!result.ok) return `Couldn't log it: ${result.error}`;
+
+      return (
+        `Logged — "${title}" is on ${date} as a completed session, with their own words kept on it. ` +
+        `Confirm it in one short sentence naming the session and the day. Do not list macros or mention their meal plan.`
       );
     }
 
