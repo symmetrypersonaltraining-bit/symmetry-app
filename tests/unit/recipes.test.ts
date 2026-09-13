@@ -97,8 +97,13 @@ test("re-submitting after a decline clears the old verdict", () => {
 
 test("the AI never gets to state the calories", () => {
   assert.match(AI, /Do NOT return calories/);
-  assert.match(AI, /kcal: kcalOf\(i\.protein, i\.carbs, i\.fats\)/);
-  assert.match(AI, /source: "ai" as const/);
+  // 13 Sep: it no longer gets to state the MACROS either. kcal was derived
+  // from the model's own protein/carbs/fats, which is self-consistent by
+  // construction and therefore uncheckable. Every ingredient is now priced
+  // from a food_catalog row and the calories come off that row.
+  assert.match(AI, /repriceIngredients/);
+  assert.doesNotMatch(AI, /kcal: kcalOf\(i\.protein, i\.carbs, i\.fats\)/,
+    "deriving kcal from the model's own macros is not a check");
 });
 
 test("free foods are not given invented macros", () => {

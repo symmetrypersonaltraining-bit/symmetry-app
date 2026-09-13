@@ -22,6 +22,7 @@ import { coachForViewer } from "@/lib/coachIdentity";
 import { nutrientPromptSpec } from "@/lib/nutrition/nutrients";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
 import { planIsLocked, lockedPlanMessage } from "@/lib/nutrition/planLock";
+import { repricePlanDraft } from "@/lib/nutrition/repriceDraft";
 import {
   ageFrom, missingForExpenditure, parseConsultAnswers, recommendTargets,
   MISSING_LABEL, type BodyInputs, type Recommendation,
@@ -252,13 +253,39 @@ export async function POST(req: NextRequest) {
     // instead of the model's prose about them.
     if (recommended) {
       plan = { ...plan, targets: recommended.targets, reasoning: recommended.reasoning };
-      const { ok, drift } = planTargetDrift(plan);
-      plan = ok
-        ? { ...plan, targetsMet: undefined, drift: undefined }
-        : { ...plan, targetsMet: false as const, drift };
     }
+
+    // ── EVERY ITEM IS PRICED FROM A ROW BEFORE ANYBODY SEES THE PLAN ─────────
+    //
+    // Dustin, 13 Sep: "This must be fixed anywhere in the app ai gets macros n
+    // cal. Do not miss any paths in the app!"
+    //
+    // p/c/f/kcal per item came back from the model, from recall, and accepting
+    // this draft writes them into meal_items — which IS the plan's definition
+    // of his targets, the basis of adherence, and the total behind "this plan
+    // does not reach the target". One wrong number here is a wrong yardstick
+    // for every day the plan is live, which is worse than one wrong meal.
+    //
+    // The model keeps what it is for: which foods, and how much of each.
+    const { plan: repriced, unpriced } = await repricePlanDraft(
+      { db: supabase, apiKey, clientId },
+      plan,
+    );
+    plan = repriced;
+
+    // THE DRIFT IS NOW MEASURED AGAINST REAL NUMBERS, AND ALWAYS.
+    //
+    // It used to be checked only on the consult path, against the model's own
+    // arithmetic — so a plan could "hit" a target it missed, which is Brooke
+    // Orton's 23 Aug complaint in a different disguise. A plan that drifts is
+    // still a usable draft; one that claims not to is not.
+    const { ok, drift } = planTargetDrift(plan);
+    plan = ok
+      ? { ...plan, targetsMet: undefined, drift: undefined }
+      : { ...plan, targetsMet: false as const, drift };
+
     // Draft only — the UI shows it for confirmation and performs the insert.
-    return NextResponse.json({ draft: true, plan });
+    return NextResponse.json({ draft: true, plan, ...(unpriced.length ? { unpriced } : {}) });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     console.error("nutrition-ai/plan-build failed:", msg);

@@ -4020,3 +4020,26 @@ read the photo"*. Text is now joined across all blocks by `textFromBlocks`, and
 a paused turn is handed back once before falling through to the visual estimate.
 
 Test: `tests/unit/everyDoorSearchesTheRestaurant.test.ts`.
+
+## Interlude — no model macro reaches a plan or a recipe (13 Sep)
+
+Dustin: *"This must be fixed anywhere in the app ai gets macros n cal. Do not
+miss any paths in the app!"* A full sweep of every AI call site found the same
+fault in the two places that write the numbers **everything else is measured
+against**.
+
+| Control | Before | Now |
+|---|---|---|
+| **AI plan builder** (`/nutrition-ai/plan-build`) | the model returned `p/c/f/kcal` for every item of every meal, from recall. Accepting the plan writes those into `meal_items` — which **is** the definition of the targets, the basis of adherence, and the total behind "this plan does not reach the target" | the model still chooses the foods and the amounts; every item is then **priced from a row** and the subtotals and totals recomputed. Drift is now measured against real numbers, and **always**, not only on the consult path |
+| **AI recipes** (`/api/recipes/ai`) | every ingredient's protein/carbs/fats was recall, tagged `source: "ai"`, landing in `recipe_ingredients` and then on a real day through `/api/recipes/log` | priced from rows. `source: "ai"` now marks only the last-resort estimate. The fix-the-quantities retry loop runs against real numbers too |
+| A food nothing can price | silently kept the model's number | dropped from the draft and **named** in `unpriced`, so nobody is shown a total with an invented line inside it |
+
+A library meal is left alone: `fromLibrary` means its items were already replaced
+with the library's checked rows, and re-resolving those trades known numbers for
+a fresh guess.
+
+**The honest consequence:** a plan that "hit the target" on the model's own
+arithmetic may now show drift. That is the first time the figure has been true.
+
+Test: `tests/unit/noModelMacroReachesAPlanOrARecipe.test.ts` — runs the
+re-pricer against a fake resolver, so it asserts behaviour, not source text.

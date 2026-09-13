@@ -118,10 +118,20 @@ test("base_amount is read back with the recipe", () => {
 });
 
 test("the estimator's numbers carry the amount they were for", () => {
+  // MOVED 13 Sep, and the contract got stronger rather than weaker. The route
+  // used to build its own ingredient rows twice, tagging every one `source:
+  // "ai"` and carrying the model's own macros. Both sites now call the
+  // re-pricer, which prices each line from a food_catalog row and sets
+  // base_amount from the amount that row was priced AT — so the builder's
+  // amount box still scales a real number instead of a recalled one, and
+  // `source: "ai"` now marks only the last-resort estimate.
   const AI = code(read("src/app/api/recipes/ai/route.ts"));
-  const sites = AI.match(/source: "ai" as const/g) || [];
-  assert.equal(sites.length, 2, "an AI ingredient build site moved — re-anchor this test");
-  assert.equal((AI.match(/base_amount: i\.amount \?\? null/g) || []).length, 2);
+  assert.equal((AI.match(/repriceIngredients\(/g) || []).length, 2,
+    "an AI ingredient build site moved — re-anchor this test");
+  const REPRICE = code(read("src/lib/nutrition/repriceDraft.ts"));
+  assert.match(REPRICE, /base_amount: hit\.amount/,
+    "the basis must be the amount the row was priced at");
+  assert.match(REPRICE, /source: hit\.estimated \? "ai" : "catalog"/);
 });
 
 test("the screen no longer promises something it does not do", () => {
