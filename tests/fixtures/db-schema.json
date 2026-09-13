@@ -499,14 +499,6 @@
     "height_in",
     "sex"
   ],
-  "daily_logs": [
-    "id",
-    "client_id",
-    "log_date",
-    "summary",
-    "source",
-    "created_at"
-  ],
   "days": [
     "client_owner_id",
     "created_at",

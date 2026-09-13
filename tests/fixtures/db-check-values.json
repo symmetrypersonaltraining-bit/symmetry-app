@@ -97,14 +97,6 @@
             "none"
         ]
     },
-    "daily_logs": {
-        "source": [
-            "client",
-            "trainer_backfill",
-            "claude",
-            "migration"
-        ]
-    },
     "exercise_video_candidates": {
         "confidence": [
             "high",

@@ -23,10 +23,10 @@ import path from "node:path";
  *   inside a transaction that was then rolled back.
  *
  * The trap is specific and worth naming: `source` allows 'client' on
- * workout_logs, cardio_logs, daily_logs, meal_adherence_logs and metrics — but
- * NOT on scheduled_workouts, which wants 'client_self_assign'. Same column
- * name, five tables where the obvious value is right and one where it is
- * silently wrong. AddWorkoutButton had it right the whole time.
+ * workout_logs, cardio_logs, meal_adherence_logs and metrics — but NOT on
+ * scheduled_workouts, which wants 'client_self_assign'. Same column name, four
+ * tables where the obvious value is right and one where it is silently wrong.
+ * AddWorkoutButton had it right the whole time.
  *
  * Regenerate tests/fixtures/db-check-values.json after a migration:
  *   with c as (
