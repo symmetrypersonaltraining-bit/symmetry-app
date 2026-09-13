@@ -23,6 +23,7 @@ import { nutrientPromptSpec } from "@/lib/nutrition/nutrients";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
 import { planIsLocked, lockedPlanMessage } from "@/lib/nutrition/planLock";
 import { repricePlanDraft } from "@/lib/nutrition/repriceDraft";
+import { fitPlanToTargets } from "@/lib/nutrition/fitPlanToTargets";
 import {
   ageFrom, missingForExpenditure, parseConsultAnswers, recommendTargets,
   MISSING_LABEL, type BodyInputs, type Recommendation,
@@ -273,6 +274,22 @@ export async function POST(req: NextRequest) {
     );
     plan = repriced;
 
+    // AND THEN IT IS FITTED TO THE TARGET, BECAUSE MEASURING IS NOT FIXING.
+    //
+    // Dustin, 13 Sep, on a consult draft that recommended 1,703 kcal and handed
+    // him 5,689: *"why would I ask for a recommendation then have it spit out a
+    // 5k calorie meal plan at me? The idea is the AI creates the meal plan
+    // based on set numbers, then I can fine tune the numbers."*
+    //
+    // Everything below this line measured the miss and shipped the plan with a
+    // red badge on it. fitPlanToTargets drops the one slipped-decimal item and
+    // scales the rest onto the target — see that file for why in that order,
+    // and why scaling keeps every number row-derived. `dropped` rides back with
+    // `unpriced` so a food that disappeared is never silent.
+    const fitted = fitPlanToTargets(plan);
+    plan = fitted.plan;
+    const removed = [...unpriced, ...fitted.dropped];
+
     // THE DRIFT IS NOW MEASURED AGAINST REAL NUMBERS, AND ALWAYS.
     //
     // It used to be checked only on the consult path, against the model's own
@@ -285,7 +302,7 @@ export async function POST(req: NextRequest) {
       : { ...plan, targetsMet: false as const, drift };
 
     // Draft only — the UI shows it for confirmation and performs the insert.
-    return NextResponse.json({ draft: true, plan, ...(unpriced.length ? { unpriced } : {}) });
+    return NextResponse.json({ draft: true, plan, ...(removed.length ? { unpriced: removed } : {}) });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     console.error("nutrition-ai/plan-build failed:", msg);
