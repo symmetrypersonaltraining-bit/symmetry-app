@@ -22,7 +22,7 @@
 //     Most are his own diary; a mistyped client name is indistinguishable from
 //     it, and that is a lost session nobody is told about.
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import GcalSyncButton from "@/components/GcalSyncButton";
 
@@ -56,8 +56,10 @@ export default function SyncHealth() {
   const [loaded, setLoaded] = useState(false);
   const [openList, setOpenList] = useState(false);
 
-  useEffect(() => {
-    (async () => {
+  // Callable again, deliberately. This was an anonymous function inside a
+  // one-shot effect, so the card could not move until a full page reload — and
+  // the Sync button sitting on it had no way to say anything had happened.
+  const load = useCallback(async () => {
       try {
         const sup = createClient() as any;
         // WHOSE SYNC. `gcal_sync_runs` is owner-only (20260821d) because a run
@@ -75,8 +77,9 @@ export default function SyncHealth() {
       } finally {
         setLoaded(true);
       }
-    })();
   }, []);
+
+  useEffect(() => { void load(); }, [load]);
 
   if (!loaded || !run) return null;
 
@@ -135,7 +138,7 @@ export default function SyncHealth() {
             actual manual sync button onto the cal in sync bar on the right side
             as a button on top of it." Knowing the sync is behind and being able
             to do something about it are one thought, not two controls. */}
-        <div style={{ flexShrink: 0 }}><GcalSyncButton compact /></div>
+        <div style={{ flexShrink: 0 }}><GcalSyncButton compact onDone={() => void load()} /></div>
       </div>
 
       {skipped && r.reason && (

@@ -10,7 +10,9 @@ import { useState } from "react";
  * than a full-width control beneath it — the status and the way to act on it
  * are one thought. The full-width form is kept for anywhere else it is dropped.
  */
-export default function GcalSyncButton({ compact = false }: { compact?: boolean } = {}) {
+export default function GcalSyncButton(
+  { compact = false, onDone }: { compact?: boolean; onDone?: () => void } = {},
+) {
   const [status, setStatus] = useState<"idle" | "syncing" | "done" | "error">("idle");
   const [msg, setMsg] = useState("");
 
@@ -21,6 +23,10 @@ export default function GcalSyncButton({ compact = false }: { compact?: boolean 
     try {
       const r = await fetch("/api/gcal-sync", { cache: "no-store" });
       const j = await r.json().catch(() => ({} as any));
+      // Whatever the outcome, the run is now on record — tell whoever is
+      // showing that record to read it again. See SyncHealth: its card sat on
+      // a one-shot effect and could not move until a full page reload.
+      onDone?.();
       if (r.ok && j && j.ok) {
         setStatus("done");
         const n = typeof j.synced === "number" ? j.synced : null;
