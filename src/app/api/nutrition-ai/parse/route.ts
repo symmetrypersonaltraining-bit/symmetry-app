@@ -26,6 +26,7 @@ Rules:
 - amount is the numeric quantity the user stated (null if none given); unit is its unit ("oz","cup","tbsp","g","slice",...) or null. Do NOT convert it — "6 oz" stays 6 and "oz".
 - NAME THE FOOD THE WAY A FOOD DATABASE WOULD, and include the preparation they implied: "chicken breast, cooked", "white rice, cooked", "olive oil". Do not put the amount in the name.
 - "context" is where the food came from when that changes what it is, on EVERY item of that meal: a restaurant or takeout meal gets "restaurant dish, as served at <name> (<cuisine>)", a homemade recipe "homemade"; null for a plain food. RESTAURANT FOOD IS NAMED AS THE DISH SERVED — "beef fajitas", "queso with ground beef", "flour tortillas" — never as a packaged product, and never put the restaurant name in "name".
+- A DISH NAME IS ONE FOOD, AND IT ALREADY CONTAINS ITS PARTS. "bacon cheeseburger", "chicken parmesan", "BLT", "loaded baked potato", "supreme pizza" each name ONE item on a menu. The bacon, the cheese and the bun are what a bacon cheeseburger IS — not foods eaten alongside it. Never split a dish into its components, and never list a component as its own item: the published number for the dish already includes it, so listing both counts it TWICE. Only something genuinely served separately — a side salad, a drink, a dessert, an extra roll — is another food.
 - Include EVERY food mentioned as its own item. Never invent foods that were not mentioned.`;
 
 // The 33-micronutrient request is gone entirely: micros now come off the
