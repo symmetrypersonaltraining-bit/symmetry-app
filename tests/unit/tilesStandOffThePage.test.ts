@@ -183,3 +183,80 @@ test("the page tint is what keeps a deep page from turning grey", () => {
     `tint added only ${(chroma(tinted) - chroma(sunk)).toFixed(1)} of chroma — the page is going grey`,
   );
 });
+
+/**
+ * THE WORDS ON THE PAGE, NOT ONLY THE SURFACES.
+ *
+ * Dustin, 13 Sep: *"visual is making that text above adherence box impossible
+ * to read."* He was right and the existing tests all passed, because every one
+ * of them measured page-against-tile and none of them measured TEXT against
+ * anything. --brand-text-secondary was picked against each scheme's original
+ * near-white page; sinking that page 24% moved the background most of the way
+ * to the text and left the text where it was.
+ */
+const SECONDARY_FLOOR = 4.5;
+
+/** --brand-text-secondary as .sym-page now redefines it. */
+function secondaryOn(theme: string, flipped: boolean): { text: RGB; page: RGB } {
+  const p = hex(PAL[theme]["--brand-primary"]);
+  const nativeDark = NATIVE_DARK.has(theme);
+  let bg = hex(PAL[theme]["--brand-bg"]);
+  let text = hex(PAL[theme]["--brand-text"]);
+  let v = nativeDark ? DARK : LIGHT;
+  if (flipped && !nativeDark) {
+    bg = mix(p, 14, hex("#0c0f14"));
+    text = hex("#E6EDF3");
+    v = DARK;
+  } else if (flipped && nativeDark) {
+    bg = mix(p, 6, hex("#F7F9FC"));
+    text = mix(p, 10, hex("#171B22"));
+    v = LIGHT;
+  }
+  const page = mix(p, v.tint, mix(hex("#070A10"), v.sink, bg));
+  return { text: mix(text, 88, page), page };
+}
+
+test(`muted text clears ${SECONDARY_FLOOR}:1 on the page, in every scheme`, () => {
+  const bad = Object.keys(PAL)
+    .map((t) => {
+      const { text, page } = secondaryOn(t, false);
+      return [t, Number(contrast(text, page).toFixed(2))] as const;
+    })
+    .filter(([, r]) => r < SECONDARY_FLOOR);
+  assert.deepEqual(bad, [], `unreadable muted text: ${JSON.stringify(bad)}`);
+});
+
+test(`and still clears ${SECONDARY_FLOOR}:1 once the Light/Dark toggle flips it`, () => {
+  const bad = Object.keys(PAL)
+    .map((t) => {
+      const { text, page } = secondaryOn(t, true);
+      return [t, Number(contrast(text, page).toFixed(2))] as const;
+    })
+    .filter(([, r]) => r < SECONDARY_FLOOR);
+  assert.deepEqual(bad, [], `unreadable once flipped: ${JSON.stringify(bad)}`);
+});
+
+test("this check FAILS on the token that shipped — it is not decorative", () => {
+  // The scheme's own --brand-text-secondary against the deepened page: the
+  // state he photographed. If this ever passes, the check has stopped meaning
+  // anything.
+  const worst = Object.keys(PAL).map((t) => {
+    const p = hex(PAL[t]["--brand-primary"]);
+    const nativeDark = NATIVE_DARK.has(t);
+    const v = nativeDark ? DARK : LIGHT;
+    const page = mix(p, v.tint, mix(hex("#070A10"), v.sink, hex(PAL[t]["--brand-bg"])));
+    return contrast(hex(PAL[t]["--brand-text-secondary"]), page);
+  });
+  assert.ok(
+    Math.min(...worst) < SECONDARY_FLOOR,
+    `the old token cleared the floor everywhere (worst ${Math.min(...worst).toFixed(2)}) — this test proves nothing`,
+  );
+});
+
+test("the bright today tile whitens inline muted text too", () => {
+  // The three class rules whiten what that tile knows about; the hint under
+  // ALL NUTRIENTS is an inline style on a plain <p> and reached none of them.
+  assert.match(CSS, /\.sym-tile\.is-today \[style\*="color: var\(--brand-text-secondary\)"\]/);
+  assert.match(CSS, /\.sym-tile\.is-today \[style\*="color:var\(--brand-text-secondary\)"\]/,
+    "both spellings — the DOM serialises with a space, hand-written markup often does not");
+});

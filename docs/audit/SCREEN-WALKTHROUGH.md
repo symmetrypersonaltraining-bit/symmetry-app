@@ -4305,3 +4305,85 @@ order by created_at desc limit 20;
 -- and, if a receipt is missing rather than wrong:
 select * from app_error_log where scope = 'ai-audit' order by created_at desc;
 ```
+
+### The AI was down the whole time  ·  13 Sep 2026
+
+> *"Photo didn't work, says credit balance issue."* … *"Same issue with creating
+> a plan with ai."* … *"Wtf are we doing?? Everything I'm testing is getting
+> worse."*
+
+**None of it was the app.** `ai_usage_log` answers it in one query — every AI
+call from 10:42 Central onward, across `food_parse`, `coach_card` and
+`plan_build` alike:
+
+```
+400 invalid_request_error — "Your credit balance is too low to access the
+Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."
+```
+
+Every AI feature in the app shares one key. The coach saying *"Hmm — I couldn't
+answer that one"* was the same failure wearing a friendlier sentence.
+
+**Two real faults were exposed by it, and both are fixed.**
+
+**1. He was shown the provider's own words.** The routes appended the raw API
+message to their own: `Analysis failed — ${msg.slice(0, 120)}`. On his phone
+that is confusing. On a **client's** phone it is a stranger being shown someone
+else's billing status and told nothing they can act on. `lib/ai/aiErrors.ts`
+classifies the failure and returns a sentence written for the person reading it;
+the raw text keeps its place in `ai_usage_log.error` with the request id, which
+is how this was diagnosed. Billing and auth deliberately share one message and
+neither offers a retry — *"try again"* is honest for a busy model and a lie for
+an unfunded account.
+
+**2. A failed call left no receipt.** `logNutritionAi` sits after the model
+call, so when the call throws, nothing is written. The audit log can currently
+say what a bad answer was made of and **not** that no answer came at all — which
+is the case he actually hit. Noted as the next piece rather than bolted on mid-
+outage.
+
+### The truncation, caught red-handed
+
+The same query turned up the thing that had been deferred twice. At 10:42:31,
+the last plan build before the credits ran out:
+
+```
+feature plan_build · tokens_out 8435
+"No valid JSON after 2 attempts (last reply began:
+ {"targets":{"kcal":1703,"p":144,"c":147,"f":60},...)"
+```
+
+**Those are the 1,703 kcal targets from his screenshot.** The reply ran 8,435
+output tokens against a `maxTokens: 8000` cap, was cut mid-structure, failed to
+parse on both attempts, and what reached his screen came from the **salvage**
+path — a plan rebuilt from a truncated fragment.
+
+So the 5,689 kcal and the 487 g of fat were not the model's judgement. They were
+a sentence that stopped halfway. `fitPlanToTargets` would have caught the
+symptom; this is the cause. The cap is now 16,000 — measured replies run
+6,776-8,686, so the old one sat under the median of the thing it was capping,
+and an unused ceiling costs nothing because output is billed on tokens produced.
+
+### The muted text, which was mine  ·  13 Sep 2026
+
+> *"Visual is making that text above adherence box impossible to read."*
+
+Correct, and caused by the approved background change. `--brand-text-secondary`
+is a mid-tone chosen against each scheme's **original near-white page**. Sinking
+that page 24% and tinting it moved the background most of the way to the text
+and left the text where it was.
+
+**Every contrast test passed throughout**, because all of them measured
+page-against-tile and none measured the words on either.
+
+It is derived from the page now — 88% of the scheme's own body colour, the rest
+the page — so it moves whenever the page does. **88% is measured, not picked:**
+the first attempt used 70% and still left 23 of the 30 schemes under 4.5:1,
+which is the kind of half-fix that gets reported twice. 80% leaves three short,
+85% is the first to clear, 88% puts the worst case at 4.90:1.
+
+The second half of the same screenshot: the hint under ALL NUTRIENTS sits on the
+bright `is-today` tile, which whitens the three classes it knows about — and
+that hint is an inline `color: var(--brand-text-secondary)` on a plain `<p>`, so
+none of them reached it. Matched now the same way the `--brand-primary`
+readability rule already matches, both spellings.

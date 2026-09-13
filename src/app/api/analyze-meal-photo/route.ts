@@ -9,6 +9,7 @@ import { SONNET_MODEL } from "@/lib/ai/anthropic";
 import { textFromBlocks } from "@/lib/nutrition/webNutrition";
 import { photoItemsFor } from '@/lib/nutrition/photoItems';
 import { logNutritionAi } from "@/lib/ai/nutritionAudit";
+import { aiErrorMessage } from "@/lib/ai/aiErrors";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // Imported, not spelled out. A literal here means this route silently keeps
@@ -270,7 +271,7 @@ export async function POST(req: NextRequest) {
     const msg = e instanceof Error ? e.message : 'Unknown error';
     console.error('analyze-meal-photo failed:', msg);
     // Always return JSON (never an HTML error page) so the app can show a clean message.
-    return NextResponse.json({ error: `Analysis failed — ${msg.slice(0, 120)}` });
+    return NextResponse.json({ error: aiErrorMessage(e) });
   }
 }
 

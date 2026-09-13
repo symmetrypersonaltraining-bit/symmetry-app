@@ -15,6 +15,7 @@ import { kcalOf as kcalFromMacros } from "@/lib/nutrition/dailyTotals";
 import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
 import { logNutritionAi } from "@/lib/ai/nutritionAudit";
+import { aiErrorMessage } from "@/lib/ai/aiErrors";
 
 const SYSTEM_PROMPT = `You are a nutrition parsing engine for a physique coach's app. The user gives a free-text description of foods with amounts (e.g. "8 oz chicken, 1 cup jasmine rice, 1 tbsp olive oil"). Split it into individual items.
 
@@ -141,7 +142,7 @@ export async function POST(req: NextRequest) {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     console.error("nutrition-ai/parse failed:", msg);
-    return NextResponse.json({ error: `Parse failed — ${msg.slice(0, 120)}` }, { status: 500 });
+    return NextResponse.json({ error: aiErrorMessage(e) }, { status: 500 });
   }
 }
 

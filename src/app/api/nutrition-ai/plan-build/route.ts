@@ -25,6 +25,7 @@ import { planIsLocked, lockedPlanMessage } from "@/lib/nutrition/planLock";
 import { repricePlanDraft } from "@/lib/nutrition/repriceDraft";
 import { logNutritionAi } from "@/lib/ai/nutritionAudit";
 import { fitPlanToTargets } from "@/lib/nutrition/fitPlanToTargets";
+import { aiErrorMessage } from "@/lib/ai/aiErrors";
 import {
   ageFrom, missingForExpenditure, parseConsultAnswers, recommendTargets,
   MISSING_LABEL, type BodyInputs, type Recommendation,
@@ -223,7 +224,29 @@ export async function POST(req: NextRequest) {
       apiKey,
       model: planModel,
       system: SYSTEM_PROMPT(me.firstName),
-      maxTokens: 8000,
+      // ── 8,000 WAS UNDER THE SIZE OF ITS OWN ANSWER ──────────────────────
+      //
+      // Caught red-handed in ai_usage_log at 10:42 Central on 13 Sep, on the
+      // very plan he screenshotted:
+      //
+      //   feature plan_build · tokens_out 8435
+      //   "No valid JSON after 2 attempts (last reply began:
+      //    {"targets":{"kcal":1703,"p":144,"c":147,"f":60},...)"
+      //
+      // Those are his 1,703 kcal targets. The reply ran 8,435 output tokens
+      // against a 8,000 cap, was cut mid-structure, failed to parse on BOTH
+      // attempts, and what reached his screen came from the SALVAGE path
+      // below — a plan rebuilt from a truncated fragment. That is where the
+      // 5,689 kcal and the 487 g of fat came from. Not the model's judgement;
+      // a sentence that stopped halfway.
+      //
+      // A five-meal itemised plan with micros is simply a long answer:
+      // measured replies run 6,776-8,686 tokens, so the old cap was under the
+      // p50 of the thing it was capping. 16,000 clears the largest observed
+      // reply with room to spare and is a fraction of what the model allows.
+      // The cost of an unused ceiling is nothing — output is billed on tokens
+      // produced, not on the cap.
+      maxTokens: 16000,
       messages: [{ role: "user", content: userText }],
       validate: validatePlanOnTarget,
     });
@@ -340,7 +363,7 @@ export async function POST(req: NextRequest) {
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     console.error("nutrition-ai/plan-build failed:", msg);
-    return NextResponse.json({ error: `Plan build failed — ${msg.slice(0, 120)}` }, { status: 500 });
+    return NextResponse.json({ error: aiErrorMessage(e) }, { status: 500 });
   }
 }
 

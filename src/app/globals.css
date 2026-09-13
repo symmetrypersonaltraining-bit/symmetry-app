@@ -2822,9 +2822,39 @@ option:hover {
      changes no pixel anywhere. It exists so the mock-up sheet and the app
      move the same three numbers. */
   --page-tint: 8%;
-  background: color-mix(in srgb, var(--brand-primary) var(--page-tint),
+  /* Named, because the muted-text rule below has to mix against the same
+     colour the page is actually painted. */
+  --page-bg: color-mix(in srgb, var(--brand-primary) var(--page-tint),
     color-mix(in srgb, #070A10 var(--sink), var(--brand-bg)));
+  background: var(--page-bg);
   min-height: 100vh;
+
+  /* ── MUTED TEXT HAS TO MOVE WHEN THE PAGE DOES ───────────────────────────
+     Dustin, 13 Sep, on the deepened background: *"visual is making that text
+     above adherence box impossible to read."*
+
+     Mine. --brand-text-secondary is a mid-tone chosen against each scheme's
+     ORIGINAL near-white page. Sinking that page 24% and tinting it moved the
+     background most of the way to the text and left the text where it was, so
+     "TODAY — TAP A SLOT TO BUILD" and the open-plan hint faded into it. The
+     page-vs-tile test passed the whole time, because it only ever measured
+     two surfaces and never the words on them.
+
+     Derived from the page now, so it cannot drift again: mostly the scheme's
+     own body colour, with a measured amount of whatever the page has become
+     mixed in. That darkens it on a light scheme and lightens it on a dark one,
+     in both cases AWAY from the surface behind it, while staying visibly
+     lighter than --brand-text — which is the whole point of a secondary tone.
+     Tiles are lighter than the page and inherit it, so it only gains contrast
+     there.
+
+     88% IS MEASURED, NOT PICKED. The first attempt at this used 70% and still
+     left 23 of the 30 schemes under 4.5:1 — better than before and still not
+     readable, which is exactly the kind of half-fix that gets reported twice.
+     Swept against every scheme in both appearances: 80% leaves three short,
+     85% is the first that clears, 88% puts the worst case at 4.90:1. The
+     tests below hold it. */
+  --brand-text-secondary: color-mix(in srgb, var(--brand-text) 88%, var(--page-bg));
 }
 
 [data-appearance="dark"] .sym-page,
@@ -2941,6 +2971,18 @@ option:hover {
 .sym-tile.is-today .sym-wo-name { color: #fff; }
 .sym-tile.is-today .sym-tile-lbl i { color: #fff; }
 .sym-tile.is-today .sym-tile-meta { color: rgba(255, 255, 255, .86); }
+/* THE SAME FIX, FOR TEXT THIS BLOCK CANNOT NAME.
+   The three rules above whiten the classes this tile knows about. The hint
+   under ALL NUTRIENTS is an inline `color: var(--brand-text-secondary)` on a
+   plain <p>, so none of them reached it — a mid-tone on a saturated primary
+   gradient, which is the second half of what he photographed. Matched the same
+   way the --brand-primary readability rule already matches, both spellings,
+   because the DOM serialises with a space and hand-written markup often has
+   none: missing one silently covers half the cases. */
+.sym-tile.is-today [style*="color: var(--brand-text-secondary)"],
+.sym-tile.is-today [style*="color:var(--brand-text-secondary)"] {
+  color: rgba(255, 255, 255, .86) !important;
+}
 .sym-tile.is-today .sym-wo { background: rgba(255, 255, 255, .16); }
 .sym-tile.is-today .sym-wo::before { background: rgba(255, 255, 255, .75); }
 .sym-tile.is-today .sym-wo-ic { background: rgba(255, 255, 255, .24); color: #fff; }
