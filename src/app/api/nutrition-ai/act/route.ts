@@ -28,6 +28,8 @@ import { triageSymptoms, triageBlock } from "@/lib/ai/symptomTriage";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { priceNamedFoods, type PricedItem } from "@/lib/nutrition/resolveFoodOp";
 import { priceCoachSuggestions } from "@/lib/nutrition/repriceDraft";
+import { planContextBlock, type PlanContextMeal } from "@/lib/ai/planContext";
+import { logNutritionAi } from "@/lib/ai/nutritionAudit";
 import { COACH_SYSTEM_PROMPT, assembleCoachContext } from "@/lib/ai/coach-context";
 import { coachFirstNameForClient } from "@/lib/trainerResolve";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
@@ -68,7 +70,10 @@ Rules:
 - TRAINING IS NOT YOURS. Anything about workouts, sessions, cardio, the schedule, moving/swapping/rescheduling a SESSION, or what to train today is handled by another part of the same coach. For those, respond intent "none" with params {"clarify":false} and an EMPTY "reply" — never a clarifying question, and never a sentence describing yourself as the meal or macro tracker. You are one part of one coach; the client must never be told to pick which part they are talking to. The word "move" is the trap: "move my cardio to tomorrow" is training, not a meal.
 - "confirmation" (action intents only): ONE human sentence describing exactly what will happen, including estimated kcal and P/C/F where relevant, e.g. "Swap M4 → Salmon + rice (est 520 kcal · 42P/45C/16F)?". For intent "none" use null.
 - "reply": a short, friendly coach response (1-2 sentences) to show above the confirmation card.
-- You act on THE DAY BEING VIEWED, which is stated in the user turn as LOG DATE. It is usually today; it is sometimes an earlier day the client is catching up on. Either way DAY CONTEXT is that day's meals, and any action you extract applies to it. Requests about a DIFFERENT day, the plan itself, or targets → intent "none" (answer as chat).
+- You act on THE DAY BEING VIEWED, which is stated in the user turn as LOG DATE. It is usually today; it is sometimes an earlier day the client is catching up on. Either way DAY CONTEXT is that day's meals, and every action you extract WRITES TO THAT DAY.
+- PLAN CONTEXT is the client's standing meal plan: the meals they are supposed to eat, with the foods and amounts in each. Unless the plan says otherwise it is the SAME EVERY DAY, so "tomorrow's lunch", "yesterday's dinner" and "my usual lunch" all mean that plan meal. YOU CAN SEE IT — never tell the client you can only see today, and never ask them to type out what is in a meal that is listed there.
+- EATING A PLANNED MEAL IN A DIFFERENT SLOT is an ordinary swap. "I'm having tomorrow's lunch for dinner tonight" → swap_meal on the viewed day's dinner position, with "items" copied from that PLAN meal: one item per food, with its amount and unit exactly as the plan states them. The app prices them from its own database, so copy the foods and the amounts and never a number.
+- Only a request to CHANGE THE PLAN ITSELF, or to change targets, or to write to a day other than the one being viewed, is intent "none" (answer as chat).
 - If LOG DATE is not today, say which day you are logging to in "confirmation" — e.g. "Add Greek yogurt to Fri Jul 31 (est 150 kcal · 15P/12C/4F)?". Confirming a write onto the wrong day is the one mistake here that quietly corrupts a closed day's numbers.`;
 
 const MAX_DAY_MEALS = 30;
@@ -168,6 +173,43 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Pick a client first — the coach needs a client's data." }, { status: 400 });
     }
 
+    // ── THE PLAN IS CONTEXT, NOT A DIFFERENT SUBJECT ────────────────────────
+    //
+    // "I can only see today's meals" (13 Sep) was true and was the problem: the
+    // extractor got the viewed day and nothing else, so eating tomorrow's lunch
+    // tonight — the most ordinary thing there is with a standing plan — had to
+    // be typed out food by food. Read server-side from the live plan rather
+    // than trusted from the client, like every other figure here.
+    let planMeals: PlanContextMeal[] = [];
+    try {
+      const { data: plan } = await supabase
+        .from("meal_plans")
+        .select("id")
+        .eq("client_id", clientId)
+        .eq("status", "live")
+        .lte("effective_date", logDate)
+        .order("effective_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (plan?.id) {
+        const { data: rows } = await supabase
+          .from("meals")
+          .select("position, name, timing, meal_items(food, amount, unit, is_unlimited, position)")
+          .eq("meal_plan_id", plan.id)
+          .order("position");
+        planMeals = ((rows as unknown as (PlanContextMeal & { meal_items?: PlanContextMeal["items"] })[]) || []).map((m) => ({
+          position: m.position,
+          name: m.name,
+          timing: m.timing ?? null,
+          items: (m.meal_items || []) as PlanContextMeal["items"],
+        }));
+      }
+    } catch {
+      // A plan we cannot read is a plan the model does not get to see. It still
+      // answers about the day, exactly as it did before.
+    }
+    const planBlock = planContextBlock(planMeals);
+
     const metered = await enforceMeter(clientId, "coach_action");
     if (metered) return metered;
 
@@ -211,7 +253,7 @@ export async function POST(req: NextRequest) {
           role: "user",
           content:
             `LOG DATE: ${logDate} (${dayName})${logDate === todayCT ? " — this IS today" : " — NOT today; the client is catching up on an earlier day"}\n\n` +
-            `DAY CONTEXT (that day's meals, trusted):\n${JSON.stringify(day)}\n\nCLIENT MESSAGE:\n${message}`,
+            `DAY CONTEXT (that day's meals, trusted):\n${JSON.stringify(day)}\n\nPLAN CONTEXT (the standing meal plan — the same every day unless the plan says otherwise):\n${planBlock}\n\nCLIENT MESSAGE:\n${message}`,
         },
       ],
       validate: validateActReply,
@@ -259,6 +301,12 @@ export async function POST(req: NextRequest) {
         // figure and then asks for one in the confirmation; that sentence went
         // to the screen untouched while these priced numbers went to the log.
         if (act.confirmation) act.confirmation = confirmationWithRealTotals(act.confirmation, items);
+        void logNutritionAi({
+          clientId, surface: "act", requestText: message, model: HAIKU_MODEL,
+          intent: act.intent,
+          items: items.map((i) => ({ requested: i.requested, name: i.name, amount: i.amount, unit: i.unit, p: i.p, c: i.c, f: i.f, kcal: i.kcal, food_id: i.food_id, verified: i.verified, estimated: i.estimated, source_url: i.source_url })),
+          unresolved,
+        });
         // Some landed and some did not. The confirmation has to say so BEFORE
         // the tap, not after — a total quietly missing one food is exactly the
         // kind of wrong number this path exists to stop.

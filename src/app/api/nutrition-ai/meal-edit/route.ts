@@ -22,6 +22,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { HAIKU_MODEL, callClaudeJson } from "@/lib/ai/anthropic";
 import { logUsage } from "@/lib/ai/meter";
+import { logNutritionAi } from "@/lib/ai/nutritionAudit";
 import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveFood } from "@/lib/nutrition/resolveFoodOp";

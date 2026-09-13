@@ -46,6 +46,7 @@ const ALLOWED: Record<string, { max: number; why: string }> = {
   //    case is a gap in a log that only ever gets read after the fact.
   "src/lib/ai/clientMemory.ts": { max: 3, why: "ai_chat_turns / ai_client_memory — telemetry" },
   "src/lib/ai/agent-tools.ts": { max: 2, why: "ai_action_log — audit rows" },
+  "src/lib/ai/nutritionAudit.ts": { max: 1, why: "ai_nutrition_log — the audit trail itself; it must never be able to fail a meal" },
   "src/app/api/workout-assist/route.ts": { max: 1, why: "ai_action_log — audit row" },
   "src/app/api/agent/route.ts": { max: 2, why: "ai_chat_sessions — conversation cache" },
   "src/app/api/agent/session/route.ts": { max: 1, why: "ai_chat_sessions — conversation cache" },

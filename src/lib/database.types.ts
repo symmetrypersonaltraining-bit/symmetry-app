@@ -4076,6 +4076,51 @@ export type Database = {
           },
         ]
       }
+      ai_nutrition_log: {
+        Row: {
+          any_estimated: boolean
+          any_unresolved: boolean
+          client_id: string | null
+          created_at: string
+          id: string
+          intent: string | null
+          items: Json
+          model: string | null
+          request_text: string | null
+          surface: string
+          totals: Json | null
+          unresolved: string[]
+        }
+        Insert: {
+          any_estimated?: boolean
+          any_unresolved?: boolean
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          intent?: string | null
+          items?: Json
+          model?: string | null
+          request_text?: string | null
+          surface: string
+          totals?: Json | null
+          unresolved?: string[]
+        }
+        Update: {
+          any_estimated?: boolean
+          any_unresolved?: boolean
+          client_id?: string | null
+          created_at?: string
+          id?: string
+          intent?: string | null
+          items?: Json
+          model?: string | null
+          request_text?: string | null
+          surface?: string
+          totals?: Json | null
+          unresolved?: string[]
+        }
+        Relationships: []
+      }
       app_error_log: {
         Row: {
           client_id: string | null

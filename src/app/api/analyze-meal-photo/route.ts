@@ -8,6 +8,7 @@ import { viewerIsTrainer } from "@/lib/auth/viewer";
 import { SONNET_MODEL } from "@/lib/ai/anthropic";
 import { textFromBlocks } from "@/lib/nutrition/webNutrition";
 import { photoItemsFor } from '@/lib/nutrition/photoItems';
+import { logNutritionAi } from "@/lib/ai/nutritionAudit";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 // Imported, not spelled out. A literal here means this route silently keeps
@@ -199,6 +200,24 @@ export async function POST(req: NextRequest) {
     // The receipt. A number that claims to be official and cannot say which
     // page it came from is the one thing this change exists to stop.
     if (sourceUrl) offPlanMacros.source_url = sourceUrl;
+
+    // THE RECEIPT. A photo number has no catalogue row behind it, so what the
+    // audit needs from this door is whether a page was read and what the model
+    // claimed each item was.
+    void logNutritionAi({
+      clientId, surface: "photo",
+      requestText: typeof text === 'string' && text.trim() ? text.trim() : description,
+      model: MODEL,
+      intent: source,
+      items: items.map((i) => ({
+        name: i.n, amount: null, unit: i.a,
+        p: i.p, c: i.c, f: i.f, kcal: i.k,
+        food_id: null, verified: false,
+        estimated: source !== 'restaurant_official',
+        source_url: sourceUrl,
+      })),
+      totals: { kcal, p: protein ?? 0, c: carbs ?? 0, f: fats ?? 0 },
+    });
 
     // ---- persist to the adherence log row (single update) when targeted ----
     let saved = false;
