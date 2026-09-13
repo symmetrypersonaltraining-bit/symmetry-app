@@ -4387,3 +4387,35 @@ bright `is-today` tile, which whitens the three classes it knows about — and
 that hint is an inline `color: var(--brand-text-secondary)` on a plain `<p>`, so
 none of them reached it. Matched now the same way the `--brand-primary`
 readability rule already matches, both spellings.
+
+
+---
+
+## ✦ Coach — a completion it did not perform (13 Sep 2026)
+
+Dustin, 3:12pm Central, in the coach chat:
+
+> him: *"log a 3 mile hike for my cardio today"*
+> it: *"On it — logging a 3-mile hike for your cardio today. **Done.** Good way
+> to kick off the week, Dustin…"*
+
+Nothing was written — no `cardio_logs` row, no `offplan_workout_logs` row,
+nothing on the schedule, no `ai_action_log` entry. He found out three hours
+later by opening the Workout tab and seeing "Rest day".
+
+**What the control does now.** Any reply the coach returns on a turn that
+changed nothing passes through `stripFalseClaims`
+(`src/lib/ai/coachClaimGuard.ts`). A sentence claiming a completed action is
+removed and the reply opens with *"I haven't made that change — nothing was
+logged, moved or saved."* The rest of the answer is kept. An honest reply is
+returned byte-for-byte unchanged.
+
+**What is deliberately NOT guarded:** the tool path. When a client tool has
+actually run and written, "Done." is true, and stripping it would be the same
+lie pointing the other way.
+
+**Root cause of the silence, recorded separately:** the coach has no tool for a
+workout the client actually DID. Its tools move, swap, add-from-library, mark a
+SCHEDULED session complete, log a weigh-in and look up a movement — a hike is
+none of those, so no tool ran and the request fell through to the nutrition
+coach, which answered a training question it had been told to ignore.

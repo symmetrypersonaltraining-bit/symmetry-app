@@ -30,6 +30,7 @@ import { priceNamedFoods, type PricedItem } from "@/lib/nutrition/resolveFoodOp"
 import { priceCoachSuggestions } from "@/lib/nutrition/repriceDraft";
 import { planContextBlock, type PlanContextMeal } from "@/lib/ai/planContext";
 import { logNutritionAi } from "@/lib/ai/nutritionAudit";
+import { stripFalseClaims } from "@/lib/ai/coachClaimGuard";
 import { COACH_SYSTEM_PROMPT, assembleCoachContext } from "@/lib/ai/coach-context";
 import { coachFirstNameForClient } from "@/lib/trainerResolve";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
@@ -452,8 +453,28 @@ export async function POST(req: NextRequest) {
     // Order now: definite nutrition action → tools → nutrition clarification →
     // coach. A training request can no longer be intercepted by a guess about
     // meals.
+    // ── NOTHING WAS WRITTEN, SO NOTHING MAY BE CLAIMED ─────────────────────
+    //
+    // Every return below this point is `intent: "none"` — the literal meaning
+    // of which is "I did not do anything". On 13 Sep one of them said "Done."
+    // to a request to log a hike, and Dustin found out three hours later by
+    // opening the Workout tab and seeing "Rest day".
+    //
+    // A prompt already forbade it. See lib/ai/coachClaimGuard.ts for why that
+    // was never going to be enough, and why a blunt rule is safe HERE
+    // specifically: on these paths a completion claim is false by construction.
+    const honest = (reply: string) => {
+      const { text, stripped } = stripFalseClaims(reply);
+      if (stripped.length) {
+        // Loud on purpose. This should be rare, and each one is either a model
+        // regression or a capability the coach is missing and reaching for.
+        console.error("act: stripped a false completion claim", { clientId, stripped });
+      }
+      return text;
+    };
+
     if (act.params.clarify && act.reply) {
-      return NextResponse.json({ intent: "none", message: act.reply });
+      return NextResponse.json({ intent: "none", message: honest(act.reply) });
     }
 
     // ---- intent 'none' = a question → the existing coach behavior ----------
@@ -551,13 +572,13 @@ export async function POST(req: NextRequest) {
       const suggestions = await priceCoachSuggestions(
         { db: createAdminClient(), apiKey, clientId }, coach.value.suggestions,
       );
-      return NextResponse.json({ intent: "none", message: coach.value.message, suggestions });
+      return NextResponse.json({ intent: "none", message: honest(coach.value.message), suggestions });
     }
     // Salvage: a plain-text reply (or the extractor's placeholder) still helps.
     const fallback = coach.rawText.replace(/```(?:json)?|```/g, "").trim() || act.reply;
     if (fallback) {
       await persist(memDb, clientId, message, fallback.slice(0, 1200), apiKey);
-      return NextResponse.json({ intent: "none", message: fallback.slice(0, 1200) });
+      return NextResponse.json({ intent: "none", message: honest(fallback.slice(0, 1200)) });
     }
     return NextResponse.json({ error: "The coach couldn't answer right now — try again in a moment." }, { status: 502 });
   } catch (e: unknown) {
