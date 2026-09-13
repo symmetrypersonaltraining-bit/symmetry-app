@@ -31,6 +31,8 @@ import { enforceMeter, resolveAiScope } from "@/lib/ai/scope";
 import { callClaudeJson, HAIKU_MODEL } from "@/lib/ai/anthropic";
 import { logUsage } from "@/lib/ai/meter";
 import { kcalOf } from "@/lib/recipes";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { repriceIngredients } from "@/lib/nutrition/repriceDraft";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -258,17 +260,24 @@ export async function POST(req: NextRequest) {
 
   if (!value) return NextResponse.json({ error: "Couldn't read that — try describing the ingredients one per line." }, { status: 422 });
 
-  // Calories are ours to compute, and the per-ingredient marking is what lets
-  // the builder show these as estimates rather than as facts.
-  const ingredients = value.ingredients.map((i) => ({
-    ...i,
-    source: "ai" as const,
-    // The macros it gave are for the amount it was asked about, so that amount
-    // is the basis. Without this the builder's amount box was decoration: it
-    // re-rendered the line and left the totals where they were.
-    base_amount: i.amount ?? null,
-    kcal: kcalOf(i.protein, i.carbs, i.fats),
-  }));
+  // ── THE MODEL PICKED THE FOODS. THE ROWS PRICE THEM. ──────────────────────
+  //
+  // Dustin, 13 Sep: "This must be fixed anywhere in the app ai gets macros n
+  // cal. Do not miss any paths in the app!"
+  //
+  // Every protein/carbs/fats figure here used to be the model's recall, marked
+  // `source: "ai"` and carried into recipe_ingredients — and from there onto a
+  // real day through /api/recipes/log. The amounts it chose are kept; the
+  // numbers are re-read through the same pipeline as everything else, so
+  // `source: "ai"` now means the last-resort estimate rather than every line.
+  const repriceDeps = { db: createAdminClient(), apiKey, clientId: scoped.scope.clientId ?? null };
+  const { ingredients, unpriced } = await repriceIngredients(repriceDeps, value.ingredients);
+  if (!ingredients.length) {
+    return NextResponse.json(
+      { error: `Couldn't price ${unpriced.slice(0, 3).join(", ") || "those ingredients"} against the food database — try naming them more plainly.` },
+      { status: 422 },
+    );
+  }
 
   if (body.mode === "create") {
     const t2 = body.target || {};
@@ -363,10 +372,9 @@ export async function POST(req: NextRequest) {
       await logUsage(scoped.scope.clientId ?? null, "recipe_ai", fix.tokensIn, fix.tokensOut, HAIKU_MODEL);
 
       if (fix.value && fix.value.ingredients.length) {
-        const fixedRows = fix.value.ingredients.map((i) => ({
-          ...i, source: "ai" as const, base_amount: i.amount ?? null,
-          kcal: kcalOf(i.protein, i.carbs, i.fats),
-        }));
+        // Priced from rows, exactly like the first pass. A correction that is
+        // only correct on the model's own arithmetic corrects nothing.
+        const { ingredients: fixedRows } = await repriceIngredients(repriceDeps, fix.value.ingredients);
         const fixedSv = fix.value.servings && fix.value.servings > 0 ? fix.value.servings : sv;
         const fixedPer = perServing(fixedRows, fixedSv);
         // Only take the correction if it is actually CLOSER. A retry that makes

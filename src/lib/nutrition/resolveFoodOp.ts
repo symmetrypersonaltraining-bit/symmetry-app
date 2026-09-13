@@ -457,6 +457,7 @@ export async function priceNamedFoods(
     if (web) {
       const r1 = (x: number) => Math.round(x * 10) / 10;
       items.push({
+        requested: n.name,
         // What the SOURCE calls it, for the same reason the catalogue path
         // returns the row's name: a wrong match you can see beats a wrong
         // number you cannot.
@@ -491,6 +492,7 @@ export async function priceNamedFoods(
     const scale = got.per_amount > 0 ? got.amount / got.per_amount : 1;
     const r1 = (x: number) => Math.round(x * 10) / 10;
     items.push({
+      requested: n.name,
       // The ROW's name, so a wrong choice is visible and correctable. A wrong
       // name you can see beats a wrong number you cannot.
       name: got.name,
@@ -514,6 +516,16 @@ export async function priceNamedFoods(
 }
 
 export interface PricedItem {
+  /**
+   * The name that was ASKED for, echoed back.
+   *
+   * `name` is what the row (or the published page) calls it, which is the right
+   * thing to show and the wrong thing to match on: a caller re-pricing a draft
+   * cannot line "Chicken breast, cooked" back up with the "chicken breast" it
+   * sent. Added 13 Sep, when the plan builder and the recipe writer started
+   * pricing their own drafts through here.
+   */
+  requested: string;
   name: string;
   amount: number | null;
   unit: string | null;
