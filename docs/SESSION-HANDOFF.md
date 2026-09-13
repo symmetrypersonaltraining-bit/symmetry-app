@@ -54,7 +54,7 @@ and do not create another one.
 > The biggest number left in the food work is keyword coverage: **68,383 rows
 > still say "1 serving"** (counted 9 Sep). Section 5, "Known gaps".
 
-Last updated: **13 Sep 2026, morning Central** · `main` = `3332d9d`. **Section 5 leads
+Last updated: **13 Sep 2026, midday Central** · `main` = PR #82. **Section 5 leads
 with the 13 Sep entry: every AI path that produces a macro now reads it from a
 row** (#72, #73, #74), on top of the 12 Sep restaurant lookup (#69, #70).
 Behind it: `9c9283e` (plan drift), `ef2af5d` (restaurant plate), `3452718`
@@ -663,6 +663,64 @@ and watching it come back. Without that, Monday 08:50 undoes it.
 that keeps biting: his other session pushes to this repo while you work, so find
 out where `main` actually is before you write a line. On the evening of 9 Sep it
 landed `547a544` mid-session, while this one was reading.
+
+### 🧹 SHIPPED 13 Sep — the duration job is off and `daily_logs` is gone (PR #82)
+
+Dustin, after asking what the scheduled jobs were actually for: *"turn off the
+duration job n drop daily_logs"*.
+
+**`video-duration-measure`** (pg_cron jobid 34, `*/10 * * * *`) is unscheduled.
+It fired 144 times a day and returned "0 rows" on every one — its guard only
+runs the measurer when `exercise_video_candidates` has a pending row, and that
+queue has not moved since 13 Aug. It was measuring an empty queue every ten
+minutes for a month.
+
+**`check-exercise-videos` (jobid 29) STAYS** and should not be revisited. It is
+a YouTube oEmbed ping — no API key, no quota, no cost — and it is what catches a
+demo that has gone dead on a client mid-workout. 817 of 858 exercises carry a
+video and one is already flagged dead. Same subject, opposite verdict.
+
+**`daily_logs` is dropped.** 321 rows, TWO clients, 2024-08-28 → 2026-08-02,
+last written by hand on 2 Aug; nothing on a schedule wrote it. Backed up to
+`bak_daily_logs_20260913` (321 counted against 321) with RLS on and no policy.
+Removed with it: the table's entry in the trainer agent's `READABLE` and
+`CLIENT_SCOPED_TABLES` allow-lists (`src/lib/ai/agent-tools.ts`), its block in
+`database.types.ts`, its rows in both test fixtures, and its section in
+`DATA-DICTIONARY.md`.
+
+> ⚠️ **`jarvis.<table>` is a pass-through view over EVERY public table**,
+> including the `bak_*` ones. The first drop failed on it. Any future `drop
+> table` needs `drop view jarvis.<name>` first — and a dependency check that
+> filters by view NAME will miss it, because the view is named after the table.
+
+### 🖥️ THE SCHEDULED JOBS ARE IN TWO PLACES, AND ONLY ONE IS VISIBLE FROM HERE
+
+This cost a wrong answer on 13 Sep. Asked what the "Daily client rollup" was,
+this session searched `cron.job` and the Routines API, found nothing by that
+name, and said no such job existed. He replied: *"i literally jus twatched it
+run get better at finding things."*
+
+He was right. There are THREE places a scheduled job can live:
+
+1. **`cron.job` in Supabase** — 19 pg_cron jobs. Visible via the Supabase MCP.
+2. **Routines on his Claude account** — `list_triggers`. Today: *Symmetry daily
+   feedback triage* (13:00 UTC), *Nightly off-plan roll-up* (08:00 UTC), the
+   paused nudge review, and dated one-shots.
+3. **Scheduled tasks in the Cowork DESKTOP app** — *Daily client rollup*,
+   *Symmetry exercise video fill*. **These do not appear in `list_triggers` at
+   all** (its own docs say so: "Scheduled tasks stored locally by the Cowork
+   desktop app are not listed"), and nothing in this session can read, edit or
+   turn them off. Only he can, from the **Scheduled** section of the desktop
+   app's sidebar.
+
+So: **"I could not find it" is never the answer about a scheduled job** — check
+all three, and say plainly which of the three a job lives in.
+
+*Daily client rollup* runs ~9pm Central nightly (and ran 10:41am on the 13th).
+Its output is a read-only integrity sweep — off-plan meal rows with
+`off_plan_details` but a null `est_kcal`, adherence rows outside the spec's
+match rules, and a confirmation that it touched no billing or payment table. It
+does NOT write `daily_logs`, which is how the drop above stayed safe.
 
 ### ✅ SHIPPED 13 Sep — two home cards that complained and gave him nothing (`3332d9d`, PR #79)
 

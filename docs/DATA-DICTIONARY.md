@@ -721,29 +721,6 @@ Rows: **36** — the root entity. Everything else hangs off `clients.id`. `auth_
 > ⚠️ Two overlapping billing flags: `billing_type` (`per_session` / `flat` / `none`, CHECK-constrained, nullable with no default) and the older boolean `flat_billing`. They can disagree.
 > ⚠️ `training_frequency` is CHECK-limited to 1–6, but `days_per_week` (a second, unconstrained column with the same meaning) also exists.
 
-### `daily_logs`
-
-Rows: **319** — free-text daily check-in ("how did today go") per client per date.
-
-| Column | Type | Nullable | Default |
-|---|---|---|---|
-| `id` | uuid | NO | `gen_random_uuid()` |
-| `client_id` | uuid | NO |  |
-| `log_date` | date | NO |  |
-| `summary` | text | yes |  |
-| `source` | text | yes | `'client'::text` |
-| `created_at` | timestamptz | yes | `now()` |
-
-**Keys:** PRIMARY KEY (id)
-
-**Foreign keys:**
-- FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
-
-**CHECK constraints:**
-- `daily_logs_source_check` CHECK ((source = ANY (ARRAY['client', 'trainer_backfill', 'claude', 'migration'])))
-
-**Indexes:** `daily_logs_pkey` UNIQUE (id)
-
 ### `days`
 
 Rows: **994** — one training day inside a phase ("Day A – Lower"). Parent of `sections`. `client_owner_id` non-null means the day has been *forked* for one client and must not be shared.
@@ -2322,7 +2299,6 @@ Exactly as `pg_get_constraintdef()` returns them. These vocabularies are load-be
 | `client_training_patterns` | `client_training_patterns_weekday_check` | `CHECK (((weekday >= 0) AND (weekday <= 6)))` |
 | `clients` | `clients_billing_type_check` | `CHECK ((billing_type = ANY (ARRAY['per_session'::text, 'flat'::text, 'none'::text])))` |
 | `clients` | `clients_training_frequency_check` | `CHECK (((training_frequency >= 1) AND (training_frequency <= 6)))` |
-| `daily_logs` | `daily_logs_source_check` | `CHECK ((source = ANY (ARRAY['client'::text, 'trainer_backfill'::text, 'claude'::text, 'migration'::text])))` |
 | `exercises` | `exercises_availability_status_check` | `CHECK ((availability_status = ANY (ARRAY['available'::text, 'confirm_equipment'::text, 'excluded'::text])))` |
 | `exercises` | `exercises_modality_check` | `CHECK ((modality = ANY (ARRAY['powerlifting'::text, 'bodybuilding'::text, 'functional/athletic'::text, 'conditioning'::text, 'mobility'::text])))` |
 | `food_catalog` | `food_catalog_source_check` | `CHECK ((source = ANY (ARRAY['usda'::text, 'off'::text, 'brand'::text, 'restaurant'::text, 'community'::text, 'client'::text])))` |
@@ -2399,7 +2375,6 @@ Useful for telling a live vocabulary from an aspirational one.
 | `meal_adherence_logs` | 1,446 | (covered by the `(client_id, log_date, meal_position)` unique key) |
 | `meal_items` | 1,316 | `meal_id` |
 | `meals` | 409 | `meal_plan_id` |
-| `daily_logs` | 319 | `client_id`, `log_date` |
 | `phases` | 122 | `program_id` |
 | `meal_plans` | 54 | `client_id` |
 | `macro_targets` | 41 | `client_id` |

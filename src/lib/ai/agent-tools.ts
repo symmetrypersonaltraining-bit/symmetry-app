@@ -44,7 +44,7 @@ import { planIsLocked, lockedPlanMessage } from "@/lib/nutrition/planLock";
 const READABLE = new Set([
   "clients", "appointments", "scheduled_workouts", "workout_logs", "set_logs",
   "metrics", "skinfold_logs", "macro_targets", "meal_adherence_logs",
-  "daily_logs", "cardio_logs", "exercise_notes", "programs", "phases", "days",
+  "cardio_logs", "exercise_notes", "programs", "phases", "days",
   "program_assignments", "exercises", "prescribed_exercises", "sections",
   "payment_reminders", "calendar_payments", "billing_adjustments",
   "group_challenges", "challenge_participants", "client_app_settings",
@@ -216,8 +216,7 @@ export interface ToolCaller {
 // trainer's own roster. Verified against information_schema, not assumed.
 const CLIENT_SCOPED_TABLES = new Set([
   "appointments", "scheduled_workouts", "workout_logs", "set_logs", "metrics",
-  "skinfold_logs", "macro_targets", "meal_adherence_logs", "daily_logs",
-  "cardio_logs", "exercise_notes", "program_assignments", "payment_reminders",
+  "skinfold_logs", "macro_targets", "meal_adherence_logs", "cardio_logs", "exercise_notes", "program_assignments", "payment_reminders",
   "calendar_payments", "billing_adjustments", "challenge_participants",
   "client_app_settings", "client_program_feedback", "schedule_change_proposals",
   "messages", "ai_usage_daily", "ai_action_log",
