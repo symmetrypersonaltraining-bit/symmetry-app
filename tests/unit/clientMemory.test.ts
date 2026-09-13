@@ -70,8 +70,11 @@ test("earlier conversations survive the second message of a session", () => {
 test("the exchange is stored, and awaited, before the response returns", () => {
   assert.match(ACT, /await persist\(/, "persisting is not awaited — a serverless function is frozen the moment it responds");
   const persistAt = ACT.indexOf("await persist(");
-  const returnAt = ACT.indexOf("return NextResponse.json({ intent: \"none\", message: coach.value.message");
-  assert.ok(persistAt > -1 && returnAt > -1);
+  // Matched loosely on purpose: the coach reply is now wrapped by the false-
+  // claim guard (`honest(coach.value.message)`, 13 Sep), and this test is about
+  // the ORDER of persist vs the response, not about how the message is spelled.
+  const returnAt = ACT.search(/return NextResponse\.json\(\{ intent: "none", message: [^\n]*coach\.value\.message/);
+  assert.ok(persistAt > -1 && returnAt > -1, "could not find the persist call or the coach return");
   assert.ok(persistAt < returnAt, "the turn is recorded after the response is already sent, so it never lands");
 });
 
