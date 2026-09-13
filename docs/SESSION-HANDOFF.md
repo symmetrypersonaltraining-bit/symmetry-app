@@ -54,7 +54,7 @@ and do not create another one.
 > The biggest number left in the food work is keyword coverage: **68,383 rows
 > still say "1 serving"** (counted 9 Sep). Section 5, "Known gaps".
 
-Last updated: **13 Sep 2026, night Central** · `main` = `e9b75e9`. **Section 5 leads
+Last updated: **13 Sep 2026, morning Central** · `main` = `3332d9d`. **Section 5 leads
 with the 13 Sep entry: every AI path that produces a macro now reads it from a
 row** (#72, #73, #74), on top of the 12 Sep restaurant lookup (#69, #70).
 Behind it: `9c9283e` (plan drift), `ef2af5d` (restaurant plate), `3452718`
@@ -126,7 +126,7 @@ Behind it: `9c9283e` (plan drift), `ef2af5d` (restaurant plate), `3452718`
 > Quotes for the proposal's section 8 are still the open item on the investor
 > side. Section 6 has the two Drive gotchas that cost this session two hours.
 
-**The gate is fully green**: 0 errors in `src/`, **3,227 unit tests pass 0 fail**,
+**The gate is fully green**: 0 errors in `src/`, **3,231 unit tests pass 0 fail**,
 `test-nutrition-ai.cjs` **43 passed 0 failed**, build compiles. Shipped since the
 9 Sep merges: the access rule and its switch, the two red nutrition-AI tests
 closed, the invisible meal ring and its ghost tick, **the app's own error log**
@@ -663,6 +663,34 @@ and watching it come back. Without that, Monday 08:50 undoes it.
 that keeps biting: his other session pushes to this repo while you work, so find
 out where `main` actually is before you write a line. On the evening of 9 Sep it
 landed `547a544` mid-session, while this one was reading.
+
+### ✅ SHIPPED 13 Sep — two home cards that complained and gave him nothing (`3332d9d`, PR #79)
+
+Dustin, 8:37am: *"I hit sync n it showed green check but still says this. Also
+it tells me clients need focus and shows me drafts when I click but doesn't give
+me any options to regenerate or activate the drafts."*
+
+**The sync card could not have updated, ever.** `gcal_sync_runs` was written
+**only by the scheduler** — grepping `src/` for the table returned the card and
+the generated types and nothing else — so `/api/gcal-sync`, the route the button
+calls, left no trace. `SyncHealth` reads that table and only that table. The
+green tick was the button's own local state. **The sync itself was fine**: 687
+sessions at 00:25 Central, and the card was correctly calling that scheduled run
+8 hours old. The route now records its own run (`source: 'manual'`) on the
+success path and the failure path, **reading the insert's `error`** rather than
+wrapping a try/catch around it — supabase-js resolves `{error}` instead of
+throwing, so a bare catch would have left the same silent staleness one layer
+down. `SyncHealth`'s fetch is a `useCallback` now and `GcalSyncButton` takes
+`onDone`.
+
+**The focus card had no action at all.** It listed who was missing, let him read
+the lines that existed, and told him to go read a Vercel cron log.
+`/api/cron/weekly-ai` has accepted a **signed-in trainer POST for weeks** (owner
+sweeps the whole roster; anyone else one client at a time) — the capability was
+there with nothing wired to it. It now has **"Write the missing ones"**: says
+"Writing…", refuses a second tap, reports how many lines it wrote, reloads. The
+sweep returns `focus-kept` for a focus the trainer wrote himself, so it only
+fills gaps.
 
 ### 🔎 SHIPPED 13 Sep — the AI audit log, and the coach can see the plan (`e9b75e9`, PR #76)
 
