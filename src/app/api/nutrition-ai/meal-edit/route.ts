@@ -38,6 +38,15 @@ export interface MealEditOp {
   name?: string;
   /** add/swap: the measure they named, if they named one. */
   unit?: string;
+  /**
+   * Where the food came from, when that changes what it is: "restaurant dish,
+   * as served at Rivera's (Tex-Mex)". Null for a plain food.
+   *
+   * This door passed NO context at all until 12 Sep, so neither the 11 Sep
+   * restaurant handling nor the web lookup behind it ever reached the Adjust
+   * sheet — the one place a client fixes a meal the app got wrong.
+   */
+  context?: string | null;
 
   // ── FILLED IN BY THE SERVER FROM food_catalog, NEVER BY THE MODEL ──────────
   //
@@ -83,7 +92,7 @@ const SYSTEM = `You edit ONE meal in a physique coach's app. You are given the m
 YOU NEVER STATE A NUTRITION FIGURE. No calories, no protein, no carbs, no fat, not for any food, not even if you are sure. The app reads every number from its food database. Your job is what the sentence MEANS.
 
 Respond with ONLY valid JSON — no markdown, no fences, no prose — exactly this shape:
-{"ops":[{"op":"set","id":"<id>","amount":<number>}|{"op":"remove","id":"<id>"}|{"op":"add","name":"<food>","amount":<number>,"unit":"<unit>"}|{"op":"swap","id":"<id>","name":"<food>","amount":<number>,"unit":"<unit>"}],"note":"<one short plain sentence>"}
+{"ops":[{"op":"set","id":"<id>","amount":<number>}|{"op":"remove","id":"<id>"}|{"op":"add","name":"<food>","amount":<number>,"unit":"<unit>","context":string|null}|{"op":"swap","id":"<id>","name":"<food>","amount":<number>,"unit":"<unit>","context":string|null}],"note":"<one short plain sentence>"}
 
 Rules:
 - "set" changes an existing item's amount, in THAT ITEM'S OWN UNIT. If the item is "3 each" and they say "four eggs", that is {"op":"set","amount":4}. If the item is "50 g" and they say "double it", that is 100.
@@ -97,6 +106,7 @@ Rules:
 - If they name NO measure: for "add", omit amount and unit. For "swap", also omit them — the app carries the weight of the item being replaced across, which is what a swap means. NEVER invent a placeholder unit. "each", "serving", "whole" and "piece" are not measures — if they did not name one, leave both fields out.
 - Match foods loosely against what is already on the meal — "the bread" should find "Homemade Sourdough", "eggs" should find "Boiled Eggs (whole)". If a food they mention is genuinely already listed, edit it rather than adding a duplicate.
 - Only act on what they actually said. Never change an item they did not mention. An empty ops array is a valid answer.
+- "context" (add/swap only) is where the food came from when that changes what it is: a restaurant or takeout meal gets "restaurant dish, as served at <name> (<cuisine>)", a homemade recipe "homemade", otherwise leave it out. Put it on EVERY item of that meal. Name the food as the dish served — "beef fajitas", "queso with ground beef" — never as a packaged product, and never put the restaurant name in "name".
 - "note" is what you did, in one short sentence, in plain words. No numbers, no emoji.
 
 WORKED EXAMPLE — "thomas cinnamon swirl bagel w cream cheese", nothing matching on the plate:
@@ -130,10 +140,12 @@ function validate(raw: unknown): { ops: MealEditOp[]; note: string } | null {
       const amount =
         typeof x.amount === "number" && Number.isFinite(x.amount) && x.amount > 0 ? x.amount : undefined;
       const unit = typeof x.unit === "string" && x.unit.trim() ? x.unit.trim().slice(0, 16) : undefined;
+      const context = typeof x.context === "string" && x.context.trim() ? x.context.trim().slice(0, 120) : null;
       ops.push({
         op,
         ...(op === "swap" ? { id: x.id as string } : {}),
         name,
+        context,
         // An amount with no unit is not a measure, it is a number. Both or
         // neither — a bare "6" would render as "6" and mean nothing.
         ...(amount != null && unit ? { amount, unit } : {}),
@@ -220,7 +232,7 @@ export async function POST(req: NextRequest) {
     for (const op of ops) {
       if (op.op !== "add" && op.op !== "swap") continue;
       try {
-        const resolved = await resolveFood({ db: admin, apiKey, clientId }, op.name || "", op.amount, op.unit);
+        const resolved = await resolveFood({ db: admin, apiKey, clientId }, op.name || "", op.amount, op.unit, op.context ?? null);
         if (!resolved) { op.unresolved = true; continue; }
         op.food_id = resolved.food_id;
         op.estimated = !!resolved.estimated;

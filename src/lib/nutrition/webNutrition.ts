@@ -194,8 +194,15 @@ export function validateWebFoods(raw: unknown): WebFoodResult[] | null {
   return out.length ? out : null;
 }
 
-/** Every text block, in order — the JSON lands after the search blocks, not first. */
-function allText(content: Anthropic.ContentBlock[]): string {
+/**
+ * Every text block, in order — the JSON lands AFTER the search blocks, not first.
+ *
+ * Shared, because getting this wrong is silent and total: the moment a tool is
+ * declared, `content[0]` is a `server_tool_use` block, so any caller still
+ * reading `content[0].text` parses nothing and reports the feature as broken
+ * for every client at once.
+ */
+export function textFromBlocks(content: Anthropic.ContentBlock[]): string {
   return content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
     .map((b) => b.text)
@@ -259,7 +266,7 @@ export async function lookupRestaurantFoods(opts: {
       });
     }
 
-    const parsed = extractJson(allText(resp.content));
+    const parsed = extractJson(textFromBlocks(resp.content));
     return parsed == null ? [] : (validateWebFoods(parsed) ?? []);
   } catch (e) {
     // A failed lookup is not licence to invent one. Record it and let the

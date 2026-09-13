@@ -63,9 +63,15 @@ test("a macro the model volunteers is never read", () => {
     code(ROUTE).indexOf("return { ops, note:"),
   );
   assert.ok(branch.length > 200, "the validate branch moved — re-anchor this test");
+  // WHOLE FIELD NAMES, not substrings. `x.c` is inside `x.context`, which this
+  // branch reads on purpose since 12 Sep — context is WHERE THE FOOD CAME FROM,
+  // words not numbers, and it is what carries a restaurant to the web lookup.
+  // A substring match flagged it as a volunteered carb figure, which is the one
+  // way this guard could fail: by being right about nothing.
   for (const field of ["x.p", "x.c", "x.f", "x.servings", "x.per_amount", "x.kcal"]) {
-    assert.ok(
-      !branch.includes(field),
+    assert.doesNotMatch(
+      branch,
+      new RegExp(`\\b${field.replace(".", "\\.")}\\b`),
       `the add/swap branch reads ${field} from the model again — that is the bug being designed out`,
     );
   }
