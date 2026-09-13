@@ -26,6 +26,7 @@ import { logNutritionAi } from "@/lib/ai/nutritionAudit";
 import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveFood } from "@/lib/nutrition/resolveFoodOp";
+import { kcalOf } from "@/lib/nutrition/dailyTotals";
 
 interface InItem { id: string; food: string; amount: number | null; unit: string | null }
 
@@ -259,6 +260,41 @@ export async function POST(req: NextRequest) {
         op.unresolved = true;
       }
     }
+
+    // THE ADJUST SHEET LEAVES A RECEIPT.
+    //
+    // This route already IMPORTED logNutritionAi and never called it — a
+    // dangling import that read as wired and was not, which is the quietest
+    // way for a gap like this to survive a review. It is called now, and a
+    // test asserts that every pricing surface calls it rather than merely
+    // importing it.
+    //
+    // Only the ops that put a food on the plate are receipts; a "set the
+    // amount to 150 g" op prices nothing and has nothing to trace.
+    const touched = ops.filter((o) => o.op === "add" || o.op === "swap");
+    void logNutritionAi({
+      clientId,
+      surface: "meal_edit",
+      requestText: text,
+      model: HAIKU_MODEL,
+      intent: ops.map((o) => o.op).join(","),
+      items: touched
+        .filter((o) => !o.unresolved)
+        .map((o) => ({
+          requested: o.name ?? null,
+          name: o.resolved_name || o.name || "",
+          amount: o.amount ?? null,
+          unit: o.unit ?? null,
+          p: o.p, c: o.c, f: o.f,
+          kcal: kcalOf(o.p ?? 0, o.c ?? 0, o.f ?? 0),
+          food_id: o.food_id ?? null,
+          verified: !!o.verified,
+          estimated: !!o.estimated,
+          source_url: null,
+        })),
+      unresolved: touched.filter((o) => o.unresolved).map((o) => o.name || "(unnamed)"),
+      totals: null,
+    });
 
     return NextResponse.json({ ops, note: result.value.note });
   } catch (e) {

@@ -26,6 +26,13 @@
  * An audit trail that can fail a log is worse than no audit trail. Every call
  * is fire-and-forget and every error is swallowed: a client logging dinner does
  * not care that the receipt did not save, and must never be told about it.
+ *
+ * SWALLOWED FOR THE CLIENT IS NOT THE SAME AS INVISIBLE. supabase-js RESOLVES
+ * with `{ error }` rather than throwing, so the original `await insert(...)`
+ * inside a bare try/catch could not have noticed a rejected write at all — the
+ * same shape of bug as the sync card that showed a green tick for a run it
+ * never recorded. The result is read now, and a failure is written to the
+ * server log and to app_error_log. See the catch block for why that matters.
  */
 
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -77,7 +84,7 @@ export async function logNutritionAi(entry: {
   try {
     const items = entry.items ?? [];
     const unresolved = entry.unresolved ?? [];
-    await createAdminClient()
+    const { error } = await createAdminClient()
       .from("ai_nutrition_log")
       .insert({
         client_id: entry.clientId,
@@ -99,7 +106,37 @@ export async function logNutritionAi(entry: {
         any_estimated: items.some((i) => i.estimated === true),
         any_unresolved: unresolved.length > 0,
       });
-  } catch {
-    // Never surfaces, never throws, never fails a meal. See the header.
+    if (error) throw new Error(error.message);
+  } catch (e) {
+    // ── SWALLOWED FOR THE CLIENT, NOT FOR US ────────────────────────────────
+    //
+    // The first version of this caught everything and did nothing else, and on
+    // 13 Sep the table was found EMPTY — zero rows on every surface, a day
+    // after the log shipped. The schema was fine (a manual insert worked), so
+    // the honest answer was "either nothing has run, or every write has been
+    // failing and we built a trail that cannot report its own absence."
+    //
+    // Those two states MUST NOT look identical. An audit trail whose failure
+    // mode is silence is the same class of fault as the nudge job that kept
+    // messaging after it was turned off, and as the sync card that showed a
+    // green tick for a run it never recorded.
+    //
+    // So: still never thrown, still never shown to a client logging dinner —
+    // and now written down twice, in the server log and in app_error_log,
+    // where it is queryable next to every other fault the app records.
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[ai-audit] receipt not written", entry.surface, msg);
+    try {
+      await createAdminClient().from("app_error_log").insert({
+        client_id: entry.clientId,
+        scope: "ai-audit",
+        source: "server",
+        message: `ai_nutrition_log insert failed (${entry.surface})`,
+        detail: msg.slice(0, 2000),
+        path: `/api/.../${entry.surface}`,
+      });
+    } catch {
+      // The reporter failing is where this stops. Two levels is enough.
+    }
   }
 }

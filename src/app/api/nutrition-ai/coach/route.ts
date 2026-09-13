@@ -19,6 +19,7 @@ import { modelFor, callClaudeJson } from "@/lib/ai/anthropic";
 import { aiTierFor } from "@/lib/ai/tier";
 import { validateCoachReply } from "@/lib/ai/nutrition-json";
 import { priceCoachSuggestions } from "@/lib/nutrition/repriceDraft";
+import { logNutritionAi } from "@/lib/ai/nutritionAudit";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
@@ -96,6 +97,37 @@ HARD LIMITS for this card — it sits above their food logger, not in a chat:
       { db: createAdminClient(), apiKey, clientId },
       result.value.suggestions,
     );
+    // A CHIP IS A NUMBER THAT REACHES THE LOG IN ONE TAP, SO IT GETS A RECEIPT.
+    //
+    // This surface was not on the list of six when the audit log was extended;
+    // the guard test found it by walking the API directory rather than reading
+    // a list, which is why it is written that way. #74 made these chips price
+    // from a row instead of from recall — this records which row, and which
+    // chips were dropped for having no priceable food, because a chip that
+    // silently disappears is the kind of thing only a log can explain.
+    void logNutritionAi({
+      clientId,
+      surface: "act",
+      requestText: question || "(coach card)",
+      model: cardModel,
+      intent: `suggestions ${(suggestions ?? []).length}/${(result.value.suggestions ?? []).length}`,
+      items: (suggestions ?? []).map((s) => ({
+        requested: s.food ?? s.label,
+        name: s.label,
+        amount: s.amount ?? null,
+        unit: s.unit ?? null,
+        p: s.delta.p, c: s.delta.c, f: s.delta.f, kcal: s.delta.kcal,
+        food_id: null,
+        verified: false,
+        estimated: false,
+        source_url: null,
+      })),
+      unresolved: (result.value.suggestions ?? [])
+        .filter((s: { label: string }) => !(suggestions ?? []).some((k) => k.label === s.label))
+        .map((s: { label: string }) => s.label),
+      totals: null,
+    });
+
     return NextResponse.json({ ...result.value, suggestions });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unknown error";
