@@ -4043,3 +4043,36 @@ arithmetic may now show drift. That is the first time the figure has been true.
 
 Test: `tests/unit/noModelMacroReachesAPlanOrARecipe.test.ts` — runs the
 re-pricer against a fake resolver, so it asserts behaviour, not source text.
+
+## Interlude — a dish is one food, not its parts (13 Sep)
+
+Dustin re-logged his lunch once the restaurant lookup was live: *"Texas
+Roadhouse bacon cheeseburger, with a side salad with ranch and three bread"*.
+560 kcal became **2,100** — the right order of magnitude at last — and one
+fault was still inside the total:
+
+```
+Bacon Cheeseburger (whole sandwich — patty, cheese slice, bacon and bun
+  are not individually published; macros are the full composite)   986 kcal
+American Pasteurized Processed Cheese Slice                          61 kcal  ←
+Pork, cured, bacon, cooked, baked                                    44 kcal  ←
+Roll, white, hamburger bun                                          115 kcal  ←
+House Salad                                                         232 kcal
+House Salad Ranch Dressing (2 oz)                                   299 kcal
+Fresh Baked Bread — 3 rolls                                         363 kcal
+```
+
+The line that says **in its own name** that it already contains the cheese, the
+bacon and the bun, followed by the cheese, the bacon and the bun. **220 kcal
+counted twice**, on the most confident-looking line of the meal.
+
+| Control | Before | Now |
+|---|---|---|
+| Every parsing door (`parse`, `act`, `meal-edit`) | *"with", "and", "w" introduce another food* — a good rule doing the wrong job. The bacon in a bacon cheeseburger is not a food eaten alongside the burger, it is what the burger **is** | **A DISH NAME IS ONE FOOD, AND IT ALREADY CONTAINS ITS PARTS.** A dish is never split into components and a component is never listed on its own. Only something genuinely served separately — a side salad, a drink, an extra roll — is another food |
+| The restaurant lookup | could return a component line of its own accord | one item per food it was asked about, and nothing else |
+
+His row was corrected to **1,880 kcal · 85P / 133C / 112F** (backed up to
+`bak_dustin_lunch_20260912_v2`); the three duplicate component lines are gone
+and the composite, the salad, the ranch and the rolls stand.
+
+Test: `tests/unit/aDishIsOneFoodNotItsParts.test.ts`.
