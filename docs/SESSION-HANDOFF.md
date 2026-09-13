@@ -54,7 +54,7 @@ and do not create another one.
 > The biggest number left in the food work is keyword coverage: **68,383 rows
 > still say "1 serving"** (counted 9 Sep). Section 5, "Known gaps".
 
-Last updated: **13 Sep 2026, midday Central** · `main` = PR #82. **Section 5 leads
+Last updated: **13 Sep 2026, evening Central** · `main` = `05c6c40` (#91). **Section 5 leads
 with the 13 Sep entry: every AI path that produces a macro now reads it from a
 row** (#72, #73, #74), on top of the 12 Sep restaurant lookup (#69, #70).
 Behind it: `9c9283e` (plan drift), `ef2af5d` (restaurant plate), `3452718`
@@ -663,6 +663,92 @@ and watching it come back. Without that, Monday 08:50 undoes it.
 that keeps biting: his other session pushes to this repo while you work, so find
 out where `main` actually is before you write a line. On the evening of 9 Sep it
 landed `547a544` mid-session, while this one was reading.
+
+### 🚨 SHIPPED 13 Sep evening — the coach said "Done." and wrote nothing (#89, #90)
+
+Dustin, 3:12pm Central, in the ✦ Coach: *"log a 3 mile hike for my cardio
+today"*. It replied **"On it — logging a 3-mile hike for your cardio today.
+Done."** and wrote NOTHING — no `cardio_logs` row, no `offplan_workout_logs`
+row, nothing on the schedule, no `ai_action_log` entry. He found out three hours
+later by opening the Workout tab and seeing "Rest day".
+
+**Two faults stacked, and the second is the class of bug that makes an app
+unsellable.**
+
+**#89 — it may no longer claim what it did not do.** `stripFalseClaims`
+(`src/lib/ai/coachClaimGuard.ts`) runs on the three `intent: "none"` returns of
+`/api/nutrition-ai/act`. Those are by construction the turns where nothing was
+written, so a first-person completion claim there is false *every time* — which
+is what lets the patterns stay blunt. The claiming sentence goes, the reply
+leads with *"I haven't made that change…"*, the useful coaching survives, and an
+honest reply is byte-for-byte unchanged.
+
+> The tool path (`run.text`, only returned when `toolsUsed > 0`) is deliberately
+> NOT guarded — a tool that ran did write, and stripping its "Done." is the same
+> lie pointing the other way. A test asserts it stays unguarded.
+
+**#90 — it can now actually log one.** New client tool `log_a_workout_i_did`.
+None of the nine existing ones could: `i_did_do_that` needs a SCHEDULED session,
+`add_my_workout` needs a day already in the library, move/swap need something to
+move. 13 Sep was a rest day. So `toolsUsed` came back 0 and the turn fell
+through — **a gap in that list is not neutral; the model fills it by inventing a
+confirmation.**
+
+> ⚠️ **`/api/workout-manual`'s write now lives in
+> `src/lib/workouts/manualWorkout.ts`** and BOTH the route and the coach tool
+> call `createManualWorkout`. The route keeps its request validation. Tests that
+> covered the write moved with it (`programEditWritesAreChecked`, the
+> `uncheckedWrites` allowlist entry, one needle in `clientWriteFeedback`).
+>
+> This is also what makes the nightly custom-workout Routine deletable — see the
+> "AI that runs outside the app" section of `docs/audit/AI-COMPONENTS.md`.
+
+The tool-pass prompt was widened too (**Item F**). Its own Item E already
+records that adding a tool without widening that sentence changes nothing: the
+sentence lists QUESTIONS, and "I did a hike" is not a question.
+
+### 🔴 SHIPPED 13 Sep evening — the credit banner would not clear (#91)
+
+Dustin, 5:33pm: *"I added but the notification won't clear."*
+
+| time (CT) | |
+|---|---|
+| 11:24–11:36 | five real billing refusals |
+| **15:12** | **coach_action SUCCEEDS — the AI is working again** |
+| 17:33:09 | he records a $30 top-up |
+| 17:33 | the screenshot: "Every AI feature is down" |
+
+The card was wrong for **two and a half hours**, through three successful calls
+and a top-up, because the only thing that could clear an outage was the refusal
+ageing out of `OUTAGE_WINDOW_MS` (6h). It would have cleared itself at 17:36:56,
+four minutes after he complained, by expiry rather than by knowing anything. The
+"I added credit — record it" button wrote a row nothing read.
+
+A refusal now stands only until something with a LATER timestamp disproves it:
+a call that succeeded since, or a top-up recorded since. Both compared against
+the refusal's own time, so an older top-up can never suppress a newer refusal —
+tested in both directions, because getting that wrong mutes the card exactly
+when it is needed.
+
+> The top-up time comes from `ai_credit_topups.created_at`, **not `added_on`** —
+> `added_on` is a DATE and cannot order events within a day.
+
+> 🔎 **Still open, same file:** the outage query takes the single most recent
+> error row of any kind, so a later UNRELATED failure (a JSON parse error, say)
+> masks a real billing refusal. Not what he hit, but it is the same logic
+> under-reporting instead of over-reporting.
+
+### 📋 13 Sep — his data, entered by hand while those were being fixed
+
+- **The 3-mile hike** is logged on 2026-09-13 as a completed session ("3 Mile
+  Hike", day `a187adce`), written in the same shape `/api/workout-manual` uses.
+- **Breakfast (M1) and Lunch (M3)** logged: 945 cal (67P/51C/53F) and 751 cal
+  (70P/91C/12F). Sources: Kodiak Power Cakes mix + USDA egg/cheese rows from
+  `food_catalog`, and published labels for Johnsonville Vermont Maple links and
+  Thomas' High Protein Everything bagels.
+- **Two assumptions he has not yet corrected:** 2 slices of American cheese, and
+  the pancakes priced at ¾ cup dry mix (the box is ½ cup = three 4-inch, so two
+  *large* was read as 1.5 servings).
 
 ### 🧹 SHIPPED 13 Sep — the duration job is off and `daily_logs` is gone (PR #82)
 
