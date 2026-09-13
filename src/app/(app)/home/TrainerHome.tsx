@@ -9,6 +9,7 @@ import LiveSessions from "@/components/LiveSessions";
 import CountUp from "@/components/CountUp";
 import GcalSyncButton from "@/components/GcalSyncButton";
 import SyncHealth from "@/components/SyncHealth";
+import AiCreditHealth from "@/components/AiCreditHealth";
 import TutorialCard from "@/components/TutorialCard";
 import { useCoach } from "@/lib/useCoach";
 import { centralHour } from "@/lib/central-time";
@@ -201,6 +202,12 @@ export default function TrainerHome({
           on a phone Settings was the only door the tutorial had. Renders
           nothing once every step has been seen. */}
       <TutorialCard />
+
+      {/* Above the sync bar: an empty AI account takes out every AI feature in
+          the app at once, which is a bigger outage than a stale calendar, and
+          on 13 Sep it was found by a client-facing feature failing rather than
+          by anything telling him. Silent while there is credit. */}
+      <AiCreditHealth />
 
       <SyncHealth />
       {/* Renders NOTHING while the weekly sweep is healthy. Dustin, 21 Aug:
