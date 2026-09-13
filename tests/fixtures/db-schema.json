@@ -43,6 +43,7 @@
     "turn_count",
     "updated_at"
   ],
+  "ai_nutrition_log": ["id", "client_id", "surface", "request_text", "model", "intent", "items", "unresolved", "totals", "any_estimated", "any_unresolved", "created_at"],
   "ai_corrections": [
     "id",
     "client_id",

@@ -14,6 +14,7 @@ import { readNutrients, scaleNutrients, addNutrients, roundNutrients } from "@/l
 import { kcalOf as kcalFromMacros } from "@/lib/nutrition/dailyTotals";
 import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
+import { logNutritionAi } from "@/lib/ai/nutritionAudit";
 
 const SYSTEM_PROMPT = `You are a nutrition parsing engine for a physique coach's app. The user gives a free-text description of foods with amounts (e.g. "8 oz chicken, 1 cup jasmine rice, 1 tbsp olive oil"). Split it into individual items.
 
@@ -111,6 +112,14 @@ export async function POST(req: NextRequest) {
         { status: 422 },
       );
     }
+
+    // THE RECEIPT. What was asked for, what answered, and what could not be
+    // priced — see lib/ai/nutritionAudit.ts for why the log row is not enough.
+    void logNutritionAi({
+      clientId, surface: "parse", requestText: text, model: HAIKU_MODEL,
+      items: priced.map((i) => ({ requested: i.requested, name: i.name, amount: i.amount, unit: i.unit, p: i.p, c: i.c, f: i.f, kcal: i.kcal, food_id: i.food_id, verified: i.verified, estimated: i.estimated, source_url: i.source_url })),
+      unresolved,
+    });
 
     const totals = items.reduce(
       (t, it) => ({ kcal: t.kcal + it.kcal, p: t.p + it.p, c: t.c + it.c, f: t.f + it.f }),

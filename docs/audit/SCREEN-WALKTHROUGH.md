@@ -4100,3 +4100,28 @@ Test: `tests/unit/theNumberYouReadIsTheNumberSaved.test.ts`.
   catalogue row. It **writes nothing** and has no caller anywhere in `src/`.
 - **Weekly / brief / celebration prose** re-types numbers that were computed
   server-side and handed to it. Wrong wording, not a wrong number.
+
+## Interlude — the coach can see the plan, and every AI number leaves a receipt (13 Sep)
+
+Two things Dustin asked for after the coach chat told him *"I can only see
+today's meals"* when he said the lunch he was eating for dinner was on his plan.
+
+| Control | Before | Now |
+|---|---|---|
+| Coach chat, a planned meal from another day | the action extractor was handed the **viewed day only**, and its own rules sent anything about "a DIFFERENT day, the plan itself, or targets" to chat. So eating tomorrow's lunch tonight — the most ordinary thing there is with a standing plan — had to be typed out food by food | a **PLAN CONTEXT** block carries the standing plan's meals, with the foods and amounts in each, read server-side from the live plan. "I'm having tomorrow's lunch for dinner" is now an ordinary swap on the viewed day. The block carries **no macro figures**: the pricer reads those when the swap is made |
+| Any AI nutrition request | the only record was the answer — `meal_adherence_logs`. How the number was reached was reverse-engineered afterwards, every time | **`ai_nutrition_log`** records the pricing decision itself on every client's app: which food name was asked for, which row answered, whether a page was read, whether it is a marked estimate, and what could not be priced at all |
+
+The audit table is written fire-and-forget and every error is swallowed. An
+audit trail that can fail a meal is worse than no audit trail.
+
+**The audit query**, for checking a client's day:
+
+```sql
+select created_at at time zone 'America/Chicago' as central,
+       surface, request_text, unresolved, items
+from ai_nutrition_log
+where client_id = '<id>' and (any_estimated or any_unresolved)
+order by created_at desc;
+```
+
+Tests: `tests/unit/theCoachCanSeeThePlanNotJustToday.test.ts`.
