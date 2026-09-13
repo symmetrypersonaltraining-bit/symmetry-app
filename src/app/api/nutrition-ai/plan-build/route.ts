@@ -23,6 +23,7 @@ import { nutrientPromptSpec } from "@/lib/nutrition/nutrients";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
 import { planIsLocked, lockedPlanMessage } from "@/lib/nutrition/planLock";
 import { repricePlanDraft } from "@/lib/nutrition/repriceDraft";
+import { logNutritionAi } from "@/lib/ai/nutritionAudit";
 import { fitPlanToTargets } from "@/lib/nutrition/fitPlanToTargets";
 import {
   ageFrom, missingForExpenditure, parseConsultAnswers, recommendTargets,
@@ -268,7 +269,7 @@ export async function POST(req: NextRequest) {
     // for every day the plan is live, which is worse than one wrong meal.
     //
     // The model keeps what it is for: which foods, and how much of each.
-    const { plan: repriced, unpriced } = await repricePlanDraft(
+    const { plan: repriced, unpriced, audit } = await repricePlanDraft(
       { db: supabase, apiKey, clientId },
       plan,
     );
@@ -300,6 +301,39 @@ export async function POST(req: NextRequest) {
     plan = ok
       ? { ...plan, targetsMet: undefined, drift: undefined }
       : { ...plan, targetsMet: false as const, drift };
+
+    // EVERY PLAN LEAVES A RECEIPT.
+    //
+    // Dustin, 13 Sep, before a round of testing: *"I had a session build a log
+    // to be able to go back and see exactly what happens… when I go to test
+    // anything I want you to have a log to refer to."*
+    //
+    // The log shipped wired to parse, act and photo — the paths that log ONE
+    // meal — and not to this one, which writes the numbers every one of those
+    // is then measured against. That is the opposite of where a receipt is
+    // worth most, and it was exactly the screen he was about to test.
+    //
+    // `intent` carries what this route DECIDED, not just what it was asked:
+    // the mode, what the fitter dropped and what it scaled by. Without those
+    // two a plan that came back at the target is indistinguishable from one
+    // that arrived there, and the difference is the whole question.
+    void logNutritionAi({
+      clientId,
+      surface: "plan_build",
+      requestText: userText.slice(0, 2000),
+      model: planModel,
+      intent: [
+        consult ? "consult" : foods ? "foods" : "targets",
+        `target ${plan.targets?.kcal ?? 0} kcal`,
+        fitted.dropped.length ? `dropped ${fitted.dropped.length}` : null,
+        Math.abs(fitted.factor - 1) > 0.005 ? `scaled x${fitted.factor.toFixed(2)}` : null,
+        fitted.stillOff ? "STILL OFF after fitting" : null,
+        ok ? null : `drift ${drift.kcal} kcal`,
+      ].filter(Boolean).join(" · "),
+      items: audit,
+      unresolved: removed,
+      totals: plan.totals,
+    });
 
     // Draft only — the UI shows it for confirmation and performs the insert.
     return NextResponse.json({ draft: true, plan, ...(removed.length ? { unpriced: removed } : {}) });

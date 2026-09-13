@@ -45,6 +45,7 @@
 import type { PlanDraft, PlanMeal, PlanMealItem } from "@/lib/ai/nutrition-json";
 import { priceNamedFoods, type PricedItem, type ResolveDeps } from "@/lib/nutrition/resolveFoodOp";
 import { readNutrients, scaleNutrients } from "@/lib/nutrition/nutrients";
+import type { AuditItem } from "@/lib/ai/nutritionAudit";
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
@@ -57,6 +58,33 @@ const r1 = (n: number) => Math.round(n * 10) / 10;
  * rather than one more grep over the source.
  */
 export type Pricer = typeof priceNamedFoods;
+
+/**
+ * THE RECEIPT, IN THE SHAPE THE AUDIT LOG STORES.
+ *
+ * Dustin, 13 Sep, before a round of testing: *"I had a session build a log to
+ * be able to go back and see exactly what happens… when I go to test anything I
+ * want you to have a log to refer to."*
+ *
+ * The log existed for the LOGGING paths and not for the two that build a whole
+ * plan or recipe — which is the opposite of where a receipt is worth most, and
+ * exactly what he was about to test. `PricedItem` already carries every field
+ * the log wants; this is the one-line translation, kept here so both callers
+ * record the same thing and neither has to remember how.
+ */
+export function auditFrom(priced: PricedItem[]): AuditItem[] {
+  return priced.map((p) => ({
+    requested: p.requested,
+    name: p.name,
+    amount: p.amount,
+    unit: p.unit,
+    p: p.p, c: p.c, f: p.f, kcal: p.kcal,
+    food_id: p.food_id,
+    verified: p.verified,
+    estimated: p.estimated,
+    source_url: p.source_url ?? null,
+  }));
+}
 
 /** Index the priced results by the name that was asked for. */
 function byRequested(priced: PricedItem[]): Map<string, PricedItem> {
@@ -80,8 +108,9 @@ export async function repricePlanDraft(
   deps: ResolveDeps,
   plan: PlanDraft,
   pricer: Pricer = priceNamedFoods,
-): Promise<{ plan: PlanDraft; unpriced: string[] }> {
+): Promise<{ plan: PlanDraft; unpriced: string[]; audit: AuditItem[] }> {
   const unpriced: string[] = [];
+  const audit: AuditItem[] = [];
   const meals: PlanMeal[] = [];
 
   for (const meal of plan.meals) {
@@ -94,6 +123,7 @@ export async function repricePlanDraft(
       meal.items.map((i) => ({ name: i.food, amount: i.amount, unit: i.unit, context: null })),
     );
     unpriced.push(...unresolved);
+    audit.push(...auditFrom(priced));
     const found = byRequested(priced);
 
     const items: PlanMealItem[] = [];
@@ -143,6 +173,7 @@ export async function repricePlanDraft(
       totals: { kcal: Math.round(totals.kcal), p: r1(totals.p), c: r1(totals.c), f: r1(totals.f) },
     },
     unpriced,
+    audit,
   };
 }
 
@@ -178,8 +209,8 @@ export async function repriceIngredients(
   deps: ResolveDeps,
   ingredients: DraftIngredient[],
   pricer: Pricer = priceNamedFoods,
-): Promise<{ ingredients: RepricedIngredient[]; unpriced: string[] }> {
-  if (!ingredients.length) return { ingredients: [], unpriced: [] };
+): Promise<{ ingredients: RepricedIngredient[]; unpriced: string[]; audit: AuditItem[] }> {
+  if (!ingredients.length) return { ingredients: [], unpriced: [], audit: [] };
 
   const { items: priced, unresolved } = await pricer(
     deps,
@@ -207,7 +238,7 @@ export async function repriceIngredients(
       ...(hit.micros ? { micros: scaleNutrients(readNutrients(hit.micros), 1) } : {}),
     });
   }
-  return { ingredients: out, unpriced: unresolved };
+  return { ingredients: out, unpriced: unresolved, audit: auditFrom(priced) };
 }
 
 /**

@@ -33,6 +33,7 @@ import { logUsage } from "@/lib/ai/meter";
 import { kcalOf } from "@/lib/recipes";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { repriceIngredients } from "@/lib/nutrition/repriceDraft";
+import { logNutritionAi } from "@/lib/ai/nutritionAudit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -271,7 +272,24 @@ export async function POST(req: NextRequest) {
   // numbers are re-read through the same pipeline as everything else, so
   // `source: "ai"` now means the last-resort estimate rather than every line.
   const repriceDeps = { db: createAdminClient(), apiKey, clientId: scoped.scope.clientId ?? null };
-  const { ingredients, unpriced } = await repriceIngredients(repriceDeps, value.ingredients);
+  const { ingredients, unpriced, audit } = await repriceIngredients(repriceDeps, value.ingredients);
+
+  // THE RECIPE LEAVES A RECEIPT TOO — including the one that failed.
+  //
+  // Logged HERE, before the 422 below, because "nothing could be priced" is the
+  // single most useful row this table can hold: it names the foods the pipeline
+  // could not answer, which is the list worth fixing. Logging only on the happy
+  // path would hide exactly the cases the log exists for.
+  void logNutritionAi({
+    clientId: scoped.scope.clientId ?? null,
+    surface: "recipe_ai",
+    requestText: typeof value.title === "string" ? value.title : null,
+    model: HAIKU_MODEL,
+    intent: body.mode === "create" ? "create" : "read",
+    items: audit,
+    unresolved: unpriced,
+    totals: null,
+  });
   if (!ingredients.length) {
     return NextResponse.json(
       { error: `Couldn't price ${unpriced.slice(0, 3).join(", ") || "those ingredients"} against the food database — try naming them more plainly.` },

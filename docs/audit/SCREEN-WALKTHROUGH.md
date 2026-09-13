@@ -4232,3 +4232,76 @@ the page, the sheet comes back where it was.
 - **Every read and write is wrapped.** A private window, a full quota or a photo
   too large to stringify must never break logging a meal — failing to save the
   draft costs exactly what the app did before this file existed.
+
+### The receipt, everywhere — and the one that could not report its own absence  ·  13 Sep 2026
+
+> *"I had a session build a log to be able to go back and see exactly what
+> happens, was that built everywhere or just the area I was dealing with? If
+> not, build it. When I go to test anything I want you to have a log to refer
+> to."*
+
+**It was not everywhere.** `ai_nutrition_log` shipped wired to three surfaces —
+`parse`, `act` and `photo`, the paths that log ONE meal — and not to the ones
+that build a whole plan or recipe, which write the numbers every one of those is
+then measured against. `plan_build` in particular was the screen he was about to
+test.
+
+`meal_edit` was worse than missing: it **imported** `logNutritionAi` and never
+called it. A dangling import reads as wired, which is the quietest way for a gap
+like this to survive a review.
+
+**A directory walk, not a list.** The guard test
+(`everyAiFoodPathLeavesAReceipt.test.ts`) enumerates every `route.ts` under
+`src/app/api`, keeps the ones that mention the pricing pipeline, and fails any
+that does not CALL the logger. On its first run it immediately found a
+**seventh** surface nobody had listed — `/nutrition-ai/coach`, whose suggestion
+chips write macros to the log in one tap. A list would have shipped six and
+missed it.
+
+Seven now: `parse`, `act`, `meal_edit`, `plan_build`, `recipe_ai`, `photo`, and
+the coach card.
+
+**What the plan log records that the totals cannot.** A plan that came back on
+target and one that was *dragged* there look identical in `totals`, and the
+difference is the whole question when a plan looks wrong. `intent` therefore
+carries the route's decisions: the mode, `dropped N`, `scaled x0.30`, and
+`STILL OFF after fitting` when even that could not save it. `unresolved` carries
+the unpriced foods and the fitter-dropped ones together, because both left the
+total silently.
+
+The recipe receipt is written **before** the 422, because "nothing could be
+priced" is the single most useful row this table can hold.
+
+### The log was empty, and that is two different facts
+
+Checked before handing it back for testing: **zero rows, on every surface.** A
+manual insert worked, so the schema and the grants were fine.
+
+That left two explanations that looked exactly alike from outside — nothing had
+run, or every write had been failing — and the code could not tell them apart,
+because `supabase-js` **resolves with `{ error }` rather than throwing.** The
+original `await insert(...)` inside a bare `try/catch` could not have noticed a
+rejected write at all.
+
+This is the third time this exact shape has cost time here: the nudge job that
+kept messaging after it was switched off, the sync card that showed a green tick
+for a run it never recorded, and now an audit trail whose failure mode is
+silence.
+
+The result is read now. A failure is still never thrown and never shown to a
+client logging dinner — and it is written to the server log **and** to
+`app_error_log` under scope `ai-audit`, where it sits next to every other fault
+the app records. The reporter is itself wrapped; two levels and no more.
+
+**The query, when a meal looks wrong:**
+
+```sql
+select created_at at time zone 'America/Chicago' as central,
+       surface, intent, request_text, unresolved, items
+from ai_nutrition_log
+where client_id = '<id>'
+order by created_at desc limit 20;
+
+-- and, if a receipt is missing rather than wrong:
+select * from app_error_log where scope = 'ai-audit' order by created_at desc;
+```
