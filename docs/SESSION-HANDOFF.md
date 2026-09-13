@@ -54,8 +54,9 @@ and do not create another one.
 > The biggest number left in the food work is keyword coverage: **68,383 rows
 > still say "1 serving"** (counted 9 Sep). Section 5, "Known gaps".
 
-Last updated: **12 Sep 2026, night Central** · `main` = `894a148`, the second
-half of the restaurant web-lookup work (#69, #70) — **section 5 leads with it**.
+Last updated: **13 Sep 2026, Central** · `main` = `2082edf`. **Section 5 leads
+with the 13 Sep entry: every AI path that produces a macro now reads it from a
+row** (#72, #73, #74), on top of the 12 Sep restaurant lookup (#69, #70).
 Behind it: `9c9283e` (plan drift), `ef2af5d` (restaurant plate), `3452718`
 (logger's failed tick), and the audit session's Nutrition commits.
 
@@ -125,7 +126,7 @@ Behind it: `9c9283e` (plan drift), `ef2af5d` (restaurant plate), `3452718`
 > Quotes for the proposal's section 8 are still the open item on the investor
 > side. Section 6 has the two Drive gotchas that cost this session two hours.
 
-**The gate is fully green**: 0 errors in `src/`, **3,205 unit tests pass 0 fail**,
+**The gate is fully green**: 0 errors in `src/`, **3,222 unit tests pass 0 fail**,
 `test-nutrition-ai.cjs` **43 passed 0 failed**, build compiles. Shipped since the
 9 Sep merges: the access rule and its switch, the two red nutrition-AI tests
 closed, the invisible meal ring and its ghost tick, **the app's own error log**
@@ -662,6 +663,54 @@ and watching it come back. Without that, Monday 08:50 undoes it.
 that keeps biting: his other session pushes to this repo while you work, so find
 out where `main` actually is before you write a line. On the evening of 9 Sep it
 landed `547a544` mid-session, while this one was reading.
+
+### 🔴 SHIPPED 13 Sep — EVERY AI path that produces a macro now reads it from a row (#72, #73, #74)
+
+Dustin: *"This must be fixed anywhere in the app ai gets macros n cal. Do not
+miss any paths in the app!"* A full sweep of every Anthropic call site in `src/`
+was run and is the authority for this entry. **Do not re-derive it; extend it.**
+
+**Fixed (#72) — the two paths that write the numbers everything else is measured
+against.** `plan-build` returned `p/c/f/kcal` per item from recall, and accepting
+that draft writes them into `meal_items` — the plan's own definition of his
+targets, the basis of adherence, and the total behind "this plan does not reach
+the target". `recipes/ai` did the same per ingredient, into `recipe_ingredients`
+and then onto a real day via `recipes/log`. **`src/lib/nutrition/repriceDraft.ts`**
+is the new shared re-pricer: the model still picks foods and amounts, every
+number is re-read through catalogue → USDA → published page → marked estimate,
+and a food nothing can price is **dropped and named** in `unpriced`. Library
+meals are skipped (their rows are already checked). **Plan drift is now measured
+against real numbers, on every path.** A plan that "hit" its target on the
+model's arithmetic may now show drift — that is its first true reading.
+
+**Fixed (#73) — a dish is one food.** He re-logged lunch as *"Texas Roadhouse
+bacon cheeseburger, with a side salad with ranch and three bread"*: 560 → 2,100
+kcal, right at last, with **220 kcal counted twice** — the composite sandwich
+line (whose own name says it includes the cheese, bacon and bun) followed by
+separate lines for the cheese, the bacon and the bun. All three parsing doors
+now state that **a dish name already contains its parts**; the restaurant lookup
+returns one item per food asked about. Row corrected to **1,880 kcal ·
+85P/133C/112F**, backups `bak_dustin_lunch_20260912` and `…_v2`.
+
+**Fixed (#74) — three ways a recalled figure still reached a person.** The coach
+chat's **confirmation sentence** (prompt forbids a figure, then demands one; it
+went to screen untouched while priced numbers went to the log → now rebuilt by
+`confirmationWithRealTotals`). The coach's **suggestion chips** (`delta` was
+recall and one tap wrote it to `est_*`; the model now names the food, the row
+prices it, an unpriceable chip is dropped). The photo's **`restaurant_official`**
+claim with no page behind it (now downgraded to a visual estimate).
+
+**Left model-stated ON PURPOSE, with reasons — do not "fix" without asking:**
+`set_macro_targets` (trainer agent tool: trainer-only, plan-lock gated, he
+dictates the numbers; `expenditure.ts` computes these properly for the consult
+path and is the obvious next step), `/nutrition-ai/verify-food` (writes nothing,
+**no caller anywhere in `src/`**), and the weekly/brief/celebration prose (it
+re-types numbers computed server-side — wrong wording, not a wrong number).
+
+**Cost and latency**: re-pricing a plan is one resolve per item, sequential, so
+a 25-item plan is noticeably slower to build than it was. That was accepted as
+the price of real numbers. Restaurant lookups are a few cents each and run only
+when a place is named.
 
 ### 🔴 SHIPPED 12 Sep — a restaurant is SEARCHED, not matched to a grocery row (`0e06156` #69, `894a148` #70)
 
