@@ -314,3 +314,84 @@ will enforce:
 block tells the model not to reason about their body from training history, goal
 or age — "an assessment you invented is worse than none." That is contract rule
 2, "no data" is not "zero".
+
+---
+
+## AI THAT RUNS OUTSIDE THE APP — the list of what still has to come inside
+
+Added 13 Sep 2026. Dustin, on the last scheduled job left standing: *"keep the
+workout rollup but put that in the ai audit list so we can build the ai within
+the app and ge trid of that one."*
+
+**The rule this section exists to enforce:** an AI component that writes to
+client data and lives in a nightly Claude session is not auditable the way the
+in-app ones now are. It has no meter row, no `ai_nutrition_log` receipt, no
+model policy from `modelFor()`, no test, and no gate — it is a prompt in a
+Routine that a person has to remember to read. Every one of them is a candidate
+to be built into the app and switched off.
+
+### ⛔ Retired 13 Sep — the off-plan MEAL estimator
+
+The same Routine used to carry a PART 2 that read
+`meal_adherence_logs.off_plan_details` free text, estimated the macros *"like a
+knowledgeable coach"*, and wrote `est_kcal / est_protein / est_carbs /
+est_fats` straight onto the client's rings and charts.
+
+That is the exact failure the 12–13 Sep work was built to end: a number from a
+model's recall, with no catalogue row, no cited page, and no receipt. **Removed
+from the Routine's prompt, with a paragraph in it saying why and forbidding its
+return under another name.**
+
+It was also already redundant. The app prices an off-plan meal at the moment it
+is logged — September: **99 of 99 rows priced**, `macros_pending = false`,
+created at meal time. The only rows it ever left behind are four annotations
+(2026-07-20, 07-22, 07-24, 08-08) that it could not match anyway, and that need
+a ruling from Dustin rather than an estimate.
+
+### 🔨 TO BUILD IN-APP — the custom-workout roll-up
+
+**Routine:** `trig_01Q1BxfHbPrnwRL3TbVYmUnE`, "Nightly custom-workout roll-up",
+`0 8 * * *` UTC (3am Central), Opus. **Kept running until the app does it.**
+
+| | |
+|---|---|
+| **reads** | `offplan_workout_logs` where `status = 'pending'` — a workout the client typed into "Add workout": title, free-text body, type, `log_date` |
+| **decides** | which section bucket it belongs in (cardio/walk/run → Cardio; pilates/yoga/mobility/misc → Accessory Strength; lifting → Primary Strength), and whether two rows are the same workout typed twice |
+| **writes** | a `days` row in the client's active phase, a `sections` row under it, a completed `scheduled_workouts` row on the day performed, and `offplan_workout_logs.status = 'rolled_up'` with `rolled_day_id` |
+| **when** | nightly, 3am Central |
+| **model** | Opus — far more than this needs |
+
+**Why it is a real feature and not dead weight:** without it, a client types a
+workout they actually did and it never reaches their library or their completed
+history. Idle is not the same as unnecessary — 0 rows pending today and the last
+one 14 Aug, but the button is live on the client's screen.
+
+**Against the bar:**
+
+1. **Model** — fails. Opus on a bucket-classification that Haiku does, once a
+   night, at Opus prices.
+2. **Behaviour** — a client's workout appears in their library the next morning
+   rather than when they log it. Nobody asked for a delay; it is an artefact of
+   the job being nightly.
+3. **Research** — n/a, nothing to look up.
+
+**What building it in looks like:** the classification is the only AI in it, and
+it is one short Haiku call — or, honestly, a keyword map with an AI fallback.
+The rest is the chained insert the Routine's prompt already spells out, which
+belongs in a route next to the "Add workout" handler so the roll-up happens on
+submit. Then this Routine is deleted, not disabled.
+
+### 📋 The rest of the outside-the-app AI, for completeness
+
+| Job | Where it lives | Writes client data? | Verdict |
+|---|---|---|---|
+| Nightly custom-workout roll-up | Claude Routine | **yes** | build in-app, then delete — above |
+| Symmetry daily feedback triage | Claude Routine, 13:00 UTC | no — reports only | fine outside; it reads `app_feedback` and writes Dustin a file |
+| Nightly client nudge review | Claude Routine, PAUSED | would, behind `nudges_live` | revisit when the flag goes live; it writes client-facing messages |
+| Daily client rollup | **Cowork desktop app** | no — read-only sweep | retired 13 Sep; its job is now `ai_nutrition_log` |
+| Symmetry exercise video fill | **Cowork desktop app** | fills `exercise_video_candidates` | not yet assessed — next in this section |
+
+> ⚠️ **Desktop-app scheduled tasks cannot be read or changed from a session.**
+> They do not appear in `list_triggers`. Only Dustin can see or stop them, from
+> the Scheduled list in the Cowork desktop app. `docs/SESSION-HANDOFF.md` has
+> the three-places-a-job-can-live note.
