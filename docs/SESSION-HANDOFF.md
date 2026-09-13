@@ -54,7 +54,7 @@ and do not create another one.
 > The biggest number left in the food work is keyword coverage: **68,383 rows
 > still say "1 serving"** (counted 9 Sep). Section 5, "Known gaps".
 
-Last updated: **13 Sep 2026, Central** · `main` = `2082edf`. **Section 5 leads
+Last updated: **13 Sep 2026, night Central** · `main` = `e9b75e9`. **Section 5 leads
 with the 13 Sep entry: every AI path that produces a macro now reads it from a
 row** (#72, #73, #74), on top of the 12 Sep restaurant lookup (#69, #70).
 Behind it: `9c9283e` (plan drift), `ef2af5d` (restaurant plate), `3452718`
@@ -126,7 +126,7 @@ Behind it: `9c9283e` (plan drift), `ef2af5d` (restaurant plate), `3452718`
 > Quotes for the proposal's section 8 are still the open item on the investor
 > side. Section 6 has the two Drive gotchas that cost this session two hours.
 
-**The gate is fully green**: 0 errors in `src/`, **3,222 unit tests pass 0 fail**,
+**The gate is fully green**: 0 errors in `src/`, **3,227 unit tests pass 0 fail**,
 `test-nutrition-ai.cjs` **43 passed 0 failed**, build compiles. Shipped since the
 9 Sep merges: the access rule and its switch, the two red nutrition-AI tests
 closed, the invisible meal ring and its ghost tick, **the app's own error log**
@@ -663,6 +663,55 @@ and watching it come back. Without that, Monday 08:50 undoes it.
 that keeps biting: his other session pushes to this repo while you work, so find
 out where `main` actually is before you write a line. On the evening of 9 Sep it
 landed `547a544` mid-session, while this one was reading.
+
+### 🔎 SHIPPED 13 Sep — the AI audit log, and the coach can see the plan (`e9b75e9`, PR #76)
+
+**THE AUDIT LOG IS HOW YOU CHECK HIS MEALS FROM NOW ON.** Dustin: *"We need a
+log from these on all client apps so you can catch where we need to improve …
+build a log so I can have you check for screw ups in future."* Three bad meals
+in three days were each found the same way round — he noticed, and the cause was
+reverse-engineered out of `meal_adherence_logs` afterwards. That row holds the
+answer and none of the working.
+
+**`ai_nutrition_log`** (migration `20260913a`) records the pricing decision
+itself, once per AI nutrition request, on every client's app: `surface`
+(parse | act | meal_edit | photo | plan_build | recipe_ai), `request_text` (what
+they actually typed, so it can be reproduced), `items` (per food: **requested**
+name, the row that answered, amount, unit, p/c/f/kcal, `food_id`, `verified`,
+`estimated`, `source_url`), `unresolved` (names nothing could price — these
+contribute nothing to any total, so a non-empty array is a meal with a food
+silently missing), `any_estimated`, `any_unresolved`.
+
+**The query to run when he reports a bad meal:**
+
+```sql
+select created_at at time zone 'America/Chicago' as central,
+       surface, request_text, unresolved, items
+from ai_nutrition_log
+where client_id = '<id>' and (any_estimated or any_unresolved)
+order by created_at desc;
+```
+
+Written through `src/lib/ai/nutritionAudit.ts`, **fire-and-forget with every
+error swallowed** — an audit trail that can fail a meal is worse than none, and
+it is on the `uncheckedWrites` allowlist for exactly that reason. Wired into
+parse, act and photo. **`meal_edit`, `plan_build` and `recipe_ai` are NOT wired
+yet** — that is the obvious next piece.
+
+**The coach can see the plan.** He said *"Look at tomorrow thats the lunch meal
+im eating tonight for dinner"* and got *"I can only see today's meals."* True:
+`/nutrition-ai/act` got the viewed day only, and its rules sent anything about
+another day or the plan to chat. `src/lib/ai/planContext.ts` now renders the
+standing plan's meals (foods and amounts) into a **PLAN CONTEXT** block read
+server-side from the live plan, and the blanket refusal is gone. The block
+carries **no macro figures on purpose** — a number in a prompt is a number the
+model quotes back; the pricer reads them when the swap is made.
+
+**His dinner on 13 Sep is logged as the plan's Lunch meal** (`meal_id` =
+`14d2cdbe…` on position 5), so it carries the plan's own items rather than a
+copy: 200 g chicken thigh, 200 g white rice, 2 tbsp avocado oil, free veg —
+909 kcal · 57.4P/56.3C/50.5F. `source` must be one of
+client/trainer_backfill/claude/migration; "trainer" fails the check constraint.
 
 ### 🔴 SHIPPED 13 Sep — EVERY AI path that produces a macro now reads it from a row (#72, #73, #74)
 
