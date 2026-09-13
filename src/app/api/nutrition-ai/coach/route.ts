@@ -18,6 +18,8 @@ import { COACH_FIRST_NAME } from "@/lib/trainer";
 import { modelFor, callClaudeJson } from "@/lib/ai/anthropic";
 import { aiTierFor } from "@/lib/ai/tier";
 import { validateCoachReply } from "@/lib/ai/nutrition-json";
+import { priceCoachSuggestions } from "@/lib/nutrition/repriceDraft";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
 
@@ -85,7 +87,16 @@ HARD LIMITS for this card — it sits above their food logger, not in a chat:
       if (fallback) return NextResponse.json({ message: fallback.slice(0, 1200) });
       return NextResponse.json({ error: "The coach couldn't answer right now — try again in a moment." }, { status: 502 });
     }
-    return NextResponse.json(result.value);
+    // A CHIP IS A ONE-TAP WRITE, SO ITS NUMBERS COME FROM A ROW.
+    //
+    // `delta` was the model's recall, and onApplySuggestion writes it straight
+    // to meal_adherence_logs.est_*. The model now names the food; the row
+    // prices it, and a chip nothing can price is dropped rather than shown.
+    const suggestions = await priceCoachSuggestions(
+      { db: createAdminClient(), apiKey, clientId },
+      result.value.suggestions,
+    );
+    return NextResponse.json({ ...result.value, suggestions });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Unknown error";
     console.error("nutrition-ai/coach failed:", msg);

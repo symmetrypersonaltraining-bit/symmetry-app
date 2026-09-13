@@ -209,3 +209,38 @@ export async function repriceIngredients(
   }
   return { ingredients: out, unpriced: unresolved };
 }
+
+/**
+ * Price a coach suggestion chip from a row, and drop the ones nothing can price.
+ *
+ * `delta` used to be whatever the model remembered, and tapping the chip wrote
+ * it straight to `meal_adherence_logs.est_*` — the last path where recall
+ * reached the log in one tap, and the one with the fewest people watching,
+ * because a chip looks like a button rather than like a number.
+ *
+ * A chip with no priceable food is REMOVED rather than shown with a guess: its
+ * whole purpose is the one tap that writes those numbers down.
+ */
+export async function priceCoachSuggestions<T extends { label: string; food?: string; amount?: number | null; unit?: string | null; delta: { p: number; c: number; f: number; kcal: number } }>(
+  deps: ResolveDeps,
+  suggestions: T[] | undefined,
+  pricer: Pricer = priceNamedFoods,
+): Promise<T[] | undefined> {
+  if (!suggestions?.length) return suggestions;
+  const named = suggestions.filter((s) => s.food);
+  if (!named.length) return undefined;
+
+  const { items } = await pricer(
+    deps,
+    named.map((s) => ({ name: s.food as string, amount: s.amount ?? null, unit: s.unit ?? null, context: null })),
+  );
+  const found = byRequested(items);
+
+  const out: T[] = [];
+  for (const s of named) {
+    const hit = found.get((s.food as string).trim().toLowerCase());
+    if (!hit) continue;
+    out.push({ ...s, delta: { p: r1(hit.p), c: r1(hit.c), f: r1(hit.f), kcal: hit.kcal } });
+  }
+  return out.length ? out : undefined;
+}

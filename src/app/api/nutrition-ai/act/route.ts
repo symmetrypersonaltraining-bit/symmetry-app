@@ -20,12 +20,14 @@ import { HAIKU_MODEL, modelFor, callClaudeJson } from "@/lib/ai/anthropic";
 import { aiTierFor } from "@/lib/ai/tier";
 import {
   ActDayMeal, ActReply, finalizeAct, validateActReply, validateCoachReply,
+  confirmationWithRealTotals,
 } from "@/lib/ai/nutrition-json";
 import { logUsage } from "@/lib/ai/meter";
 import { enforceMeter, missingKeyResponse, resolveAiScope } from "@/lib/ai/scope";
 import { triageSymptoms, triageBlock } from "@/lib/ai/symptomTriage";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { priceNamedFoods, type PricedItem } from "@/lib/nutrition/resolveFoodOp";
+import { priceCoachSuggestions } from "@/lib/nutrition/repriceDraft";
 import { COACH_SYSTEM_PROMPT, assembleCoachContext } from "@/lib/ai/coach-context";
 import { coachFirstNameForClient } from "@/lib/trainerResolve";
 import { COACH_FIRST_NAME } from "@/lib/trainer";
@@ -253,6 +255,10 @@ export async function POST(req: NextRequest) {
           });
         }
         priced = items;
+        // THE SENTENCE AND THE SAVE MUST AGREE. The prompt forbids stating a
+        // figure and then asks for one in the confirmation; that sentence went
+        // to the screen untouched while these priced numbers went to the log.
+        if (act.confirmation) act.confirmation = confirmationWithRealTotals(act.confirmation, items);
         // Some landed and some did not. The confirmation has to say so BEFORE
         // the tap, not after — a total quietly missing one food is exactly the
         // kind of wrong number this path exists to stop.
@@ -491,7 +497,12 @@ export async function POST(req: NextRequest) {
       // serverless function is frozen the moment the response is returned and
       // a detached promise would simply never run.
       await persist(memDb, clientId, message, coach.value.message, apiKey);
-      return NextResponse.json({ intent: "none", message: coach.value.message, suggestions: coach.value.suggestions });
+      // Same chips, same rule: the row prices them, not the model. See
+      // priceCoachSuggestions — a chip is a one-tap write to est_*.
+      const suggestions = await priceCoachSuggestions(
+        { db: createAdminClient(), apiKey, clientId }, coach.value.suggestions,
+      );
+      return NextResponse.json({ intent: "none", message: coach.value.message, suggestions });
     }
     // Salvage: a plain-text reply (or the extractor's placeholder) still helps.
     const fallback = coach.rawText.replace(/```(?:json)?|```/g, "").trim() || act.reply;
