@@ -4076,3 +4076,27 @@ His row was corrected to **1,880 kcal · 85P / 133C / 112F** (backed up to
 and the composite, the salad, the ranch and the rolls stand.
 
 Test: `tests/unit/aDishIsOneFoodNotItsParts.test.ts`.
+
+## Interlude — the number you read is the number saved (13 Sep)
+
+The sweep of every AI call site found three more ways a recalled figure still
+reached a person after the logging, plan and recipe paths were sourced.
+
+| Control | Before | Now |
+|---|---|---|
+| **Coach chat confirmation card** | the prompt forbids stating a figure in one line and demands one in the next — *"Swap M4 → Salmon + rice (est 520 kcal · 42P/45C/16F)?"*. That sentence went to the screen untouched while the numbers **written** came from the catalogue. The client could read one total and the log keep another, silently | `confirmationWithRealTotals` replaces the figure with the priced one. The model's prose survives; only the number is replaced, because only the number has a right answer |
+| **Coach suggestion chips** | `{"label":"Add a scoop of whey","delta":{"p":25,…}}` was pure recall, and one tap wrote that delta to `meal_adherence_logs.est_*` without the resolver ever seeing it — the least-watched path of all, because a chip looks like a button rather than a number | the model names the **food**, the amount and the unit; the server prices it from a row and fills the delta in. **A chip nothing can price is dropped**, never shown with a guess |
+| **Photo, `restaurant_official`** | the claim was accepted with no page behind it, while the restaurant lookup drops exactly that on sight. "Official" is what stops a person double-checking | no URL, no claim: it is recorded as a visual estimate and labelled as one |
+
+Test: `tests/unit/theNumberYouReadIsTheNumberSaved.test.ts`.
+
+### Still model-stated, and why they are left
+
+- **`set_macro_targets`** (trainer agent tool) writes four numbers the model
+  typed. Trainer-only, plan-lock gated, and Dustin dictates the numbers in the
+  same sentence. `expenditure.ts` already computes these properly for the
+  consult path and is the obvious next step.
+- **`/nutrition-ai/verify-food`** reports a model's "corrected" macros for one
+  catalogue row. It **writes nothing** and has no caller anywhere in `src/`.
+- **Weekly / brief / celebration prose** re-types numbers that were computed
+  server-side and handed to it. Wrong wording, not a wrong number.

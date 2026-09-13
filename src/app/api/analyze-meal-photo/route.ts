@@ -152,7 +152,16 @@ export async function POST(req: NextRequest) {
     // shown.
     const items = photoItemsFor(result.items, kcal);
 
-    const source = result.source === 'restaurant_official' ? 'restaurant_official' : 'visual_estimate';
+    // AN OFFICIAL CLAIM WITHOUT A PAGE IS NOT AN OFFICIAL CLAIM.
+    //
+    // webNutrition drops a sourceless item on sight; this route accepted
+    // `source: "restaurant_official"` with nothing behind it, which is the more
+    // dangerous half — "official" is exactly what stops a person double-checking
+    // the number. No URL, no claim: it is a visual estimate and says so.
+    const sourceUrl = typeof result.source_url === 'string' && /^https?:\/\//i.test(result.source_url)
+      ? result.source_url.slice(0, 500)
+      : null;
+    const source = result.source === 'restaurant_official' && sourceUrl ? 'restaurant_official' : 'visual_estimate';
 
     // Nutrients, through the same helper as the macros. The model is told to
     // return null when it cannot look an item up, and a null has to survive to
@@ -189,9 +198,7 @@ export async function POST(req: NextRequest) {
     if (result.restaurant && typeof result.restaurant === 'string') offPlanMacros.restaurant = result.restaurant;
     // The receipt. A number that claims to be official and cannot say which
     // page it came from is the one thing this change exists to stop.
-    if (typeof result.source_url === 'string' && /^https?:\/\//i.test(result.source_url)) {
-      offPlanMacros.source_url = result.source_url.slice(0, 500);
-    }
+    if (sourceUrl) offPlanMacros.source_url = sourceUrl;
 
     // ---- persist to the adherence log row (single update) when targeted ----
     let saved = false;

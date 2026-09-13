@@ -190,7 +190,51 @@ export function validateParseResult(raw: unknown): ParseResult | null {
 
 export interface CoachSuggestion {
   label: string;
+  /**
+   * The food the chip adds, named the way a food database would.
+   *
+   * Added 13 Sep. `delta` used to come straight from the model, and tapping the
+   * chip wrote it to meal_adherence_logs.est_* without the resolver ever seeing
+   * it — the last path where recall reached the log in one tap. The model now
+   * names the food and the amount; the server prices it and overwrites `delta`.
+   */
+  food?: string;
+  amount?: number | null;
+  unit?: string | null;
   delta: { p: number; c: number; f: number; kcal: number };
+}
+
+/**
+ * Put the PRICED total into a confirmation sentence, replacing whatever figure
+ * the model wrote there.
+ *
+ * ACT_SYSTEM_PROMPT forbids stating a nutrition figure and then asks for one in
+ * the confirmation — "Swap M4 → Salmon + rice (est 520 kcal · 42P/45C/16F)?".
+ * The sentence went to the screen untouched while the numbers actually written
+ * came from food_catalog, so the client could read one total and the log keep
+ * another, with nothing on screen saying they differed.
+ *
+ * The prose is the model's and stays; only the number is replaced, because only
+ * the number has a right answer.
+ */
+export function confirmationWithRealTotals(
+  confirmation: string,
+  priced: { kcal: number; p: number; c: number; f: number }[],
+): string {
+  if (!priced.length) return confirmation;
+  const t = priced.reduce(
+    (a, i) => ({ kcal: a.kcal + i.kcal, p: a.p + i.p, c: a.c + i.c, f: a.f + i.f }),
+    { kcal: 0, p: 0, c: 0, f: 0 },
+  );
+  // Any trailing parenthetical holding a calorie figure is the model's estimate.
+  const stripped = confirmation
+    .replace(/\s*\((?:est\.?\s*)?[^()]*\b(?:kcal|cal|calories)\b[^()]*\)/gi, "")
+    .replace(/\s*[—-]\s*(?:est\.?\s*)?\d[\d.,]*\s*(?:kcal|cal)\b[^.?!]*/gi, "")
+    .trim();
+  const real = `${Math.round(t.kcal)} kcal · ${round1(t.p)}P/${round1(t.c)}C/${round1(t.f)}F`;
+  const q = stripped.endsWith("?");
+  const body = q ? stripped.slice(0, -1).trimEnd() : stripped;
+  return `${body} (${real})${q ? "?" : ""}`;
 }
 
 export interface CoachReply {
@@ -209,8 +253,15 @@ export function validateCoachReply(raw: unknown): CoachReply | null {
     for (const s of sugg) {
       if (!s || typeof s !== "object" || typeof s.label !== "string" || !s.label.trim()) continue;
       const d = s.delta || {};
+      const food = typeof s.food === "string" && s.food.trim() ? s.food.trim().slice(0, 120) : undefined;
+      const amt = Number(s.amount);
       cleaned.push({
         label: s.label.trim(),
+        ...(food ? { food } : {}),
+        amount: Number.isFinite(amt) && amt > 0 ? amt : null,
+        unit: typeof s.unit === "string" && s.unit.trim() ? s.unit.trim().slice(0, 16) : null,
+        // Kept only so a chip still renders if pricing is unavailable; the
+        // route overwrites this with the row's numbers before it is returned.
         delta: { p: round1(num(d.p)), c: round1(num(d.c)), f: round1(num(d.f)), kcal: Math.round(num(d.kcal)) },
       });
     }
