@@ -54,10 +54,10 @@ and do not create another one.
 > The biggest number left in the food work is keyword coverage: **68,383 rows
 > still say "1 serving"** (counted 9 Sep). Section 5, "Known gaps".
 
-Last updated: **11 Sep 2026, late night Central** · `main` = `9c9283e`, the
-plan-drift fix, after `ef2af5d` (restaurant plate) and `3452718` (logger's
-failed tick), all in section 5, alongside the audit session's Nutrition
-Batch 1 commits (#40–#42).
+Last updated: **12 Sep 2026, night Central** · `main` = `894a148`, the second
+half of the restaurant web-lookup work (#69, #70) — **section 5 leads with it**.
+Behind it: `9c9283e` (plan drift), `ef2af5d` (restaurant plate), `3452718`
+(logger's failed tick), and the audit session's Nutrition commits.
 
 > 💼 **11 Sep, late: the business plan and the accounting sheet are in his
 > Drive.** Both in the folder "Symmetry Investor Package"
@@ -125,7 +125,7 @@ Batch 1 commits (#40–#42).
 > Quotes for the proposal's section 8 are still the open item on the investor
 > side. Section 6 has the two Drive gotchas that cost this session two hours.
 
-**The gate is fully green**: 0 errors in `src/`, **3,088 unit tests pass 0 fail**,
+**The gate is fully green**: 0 errors in `src/`, **3,205 unit tests pass 0 fail**,
 `test-nutrition-ai.cjs` **43 passed 0 failed**, build compiles. Shipped since the
 9 Sep merges: the access rule and its switch, the two red nutrition-AI tests
 closed, the invisible meal ring and its ghost tick, **the app's own error log**
@@ -662,6 +662,54 @@ and watching it come back. Without that, Monday 08:50 undoes it.
 that keeps biting: his other session pushes to this repo while you work, so find
 out where `main` actually is before you write a line. On the evening of 9 Sep it
 landed `547a544` mid-session, while this one was reading.
+
+### 🔴 SHIPPED 12 Sep — a restaurant is SEARCHED, not matched to a grocery row (`0e06156` #69, `894a148` #70)
+
+**Read this before touching any nutrition AI path.** Dustin, 12 Sep, after the
+second bad restaurant meal in two days: *"that ai assistant needs to search
+actual numbers when the restaurant is mentioned n needs to be able to determine
+the real numbers exactly the way you do it … This cannot be released as a paid
+app and that makes the entire project useless to me."*
+
+**The cause, and it is architectural, not a prompt problem.** `food_catalog` is
+USDA plus grocery labels. **It contains no restaurant food.** So "which of these
+ten rows is a Rivera's fajita plate" has no right answer, every answer is a
+packaged product, and the portion question is then asked about a row that was
+never the food. 11 Sep: fajitas → a packaged product at a 78 g label serving,
+queso → a frozen taco bowl, 634 kcal. 12 Sep: **a cheeseburger at 42 kcal as
+"1 slice"**. The 11 Sep `context` fix stopped the frozen-bowl class of error and
+could not touch this one.
+
+**`src/lib/nutrition/webNutrition.ts` is the new module.** When a PLACE is named
+(`placeFromContext`), the restaurant's own published nutrition is searched with
+the **`web_search_20260209` server tool** on Sonnet and the numbers are read off
+the page. **One lookup per place, not per food.** The guarantees, all tested by
+running the real validator rather than grepping source:
+
+- **No page, no number.** Every item must carry `source_url`; one without is
+  discarded, not saved. That is what keeps this from being recall.
+- **A misread is caught**: an item whose stated calories contradict its own
+  macros by more than 15% is thrown away. Calories are still DERIVED by the app.
+- **`found: false` is an honest gap**, never a zero — it falls through to the
+  existing catalogue → USDA → marked-estimate chain, so a bad search day
+  degrades to the old behaviour rather than to a guess.
+
+**All three doors carry it** (#70): `priceNamedFoods` (coach chat + describe),
+the **photo** route, and the **Adjust sheet** (which passed no `context` at all
+before). ⚠️ **The photo route read `message.content[0]`** — fine with no tool
+declared, catastrophic with one, because block 0 becomes a `server_tool_use` and
+every client gets *"Could not read the photo"*. Use `textFromBlocks` for any
+tool-carrying call, and handle `pause_turn`.
+
+**His 12 Sep lunch was NOT rewritten.** The row (`e6989c82…`, backed up to
+`bak_dustin_lunch_20260912`) is an **unlogged** draft swap reading 560 kcal: a
+cheeseburger at 42 kcal as "1 slice", a ranch garden salad at 258, three dinner
+rolls at 260. No restaurant was recorded and `off_plan_details` is just "Lunch",
+so **inventing a burger he may not have eaten is the exact failure he is angry
+about**. Waiting on him to name the place, or to re-log it now the deploy is up.
+
+**Cost**: one Sonnet call with a handful of searches per restaurant meal —
+single-digit cents against the $95 ceiling, and only when a place was named.
 
 ### ✅ THE ACCESS RULE IS LIVE — switched ON 9 Sep, all eight ruled
 
