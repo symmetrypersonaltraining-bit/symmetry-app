@@ -4125,3 +4125,26 @@ order by created_at desc;
 ```
 
 Tests: `tests/unit/theCoachCanSeeThePlanNotJustToday.test.ts`.
+
+## Interlude — a card that complains gives you the button (13 Sep)
+
+Dustin, 8:37am on the trainer home: *"I hit sync n it showed green check but
+still says this. Also it tells me clients need focus and shows me drafts when I
+click but doesn't give me any options to regenerate or activate the drafts."*
+
+Two cards, the same fault: each reports a problem and then has nothing behind it.
+
+| Control | Before | Now |
+|---|---|---|
+| **Sync** button on the calendar health bar | `gcal_sync_runs` was written **only by the scheduler** — nothing in `src/` touched it — so `/api/gcal-sync`, the route the button calls, left no trace. The card reads that table and nothing else, so it could not have changed however well the sync went, then or after a reload. The green tick was the button's own local state | the route records the run it just did, marked `source: 'manual'`, on the success path **and** on the failure path. The insert's error is read rather than merely caught, because supabase-js resolves `{error}` instead of throwing |
+| Calendar health card | loaded once inside a one-shot effect | its fetch is callable again, and the Sync button calls it when it finishes |
+| **Focus** card, on a partial week | listed who was missing, let him read the lines that existed, and stopped. Its own advice was to go and read a Vercel cron log | a **Write the missing ones** button. `/api/cron/weekly-ai` has taken a signed-in trainer POST for weeks and the owner may sweep the whole roster, so the capability was there with no control wired to it. It says "Writing…", refuses a second tap, reports how many lines it wrote, and reloads |
+
+The sweep does not overwrite a focus the trainer wrote himself — those come back
+`focus-kept` — so the button only fills gaps.
+
+**What the sync card was right about:** the 00:25 Central run really was 8 hours
+old at 8:37, and it really had synced 687 sessions. The card was reporting the
+last *scheduled* run correctly; it simply had no way to learn about a manual one.
+
+Test: `tests/unit/aCardThatComplainsGivesYouTheButton.test.ts`.

@@ -489,7 +489,8 @@ export async function POST(req: NextRequest) {
     // belongs on the critical path of the thing the business runs on.
 
     const sum = (pick: (r: TrainerSyncResult) => number) => results.reduce((a, r) => a + pick(r), 0);
-    return NextResponse.json({
+
+    const payload = {
       ok: true,
       window: narrow ? 'narrow' : 'full',
       // PER-TRAINER, and carrying enough to BE a health card on its own.
@@ -518,12 +519,53 @@ export async function POST(req: NextRequest) {
       reminders_recalculated: remindersRecalculated,
       reminders_changed: remindersChanged,
       errors: errors.slice(0, 10),
+    };
+
+    // ── A MANUAL SYNC HAS TO LEAVE THE SAME TRACE AS A SCHEDULED ONE ────────
+    //
+    // Dustin, 13 Sep: "I hit sync n it showed green check but still says this."
+    // It did sync — 687 sessions. `gcal_sync_runs` was written ONLY by pg_cron,
+    // so nothing this route did was ever recorded, and SyncHealth (which reads
+    // that table and nothing else) could not have changed however well the sync
+    // went. The green tick was the button's own local state and meant nothing
+    // about the card above it.
+    //
+    // Recorded as `manual` so a hand sync stays tellable from the schedule's,
+    // and awaited rather than fired off: the card refetches the moment the
+    // button returns, so a row written a beat later is a row he does not see.
+    // The error is READ, not just caught: supabase-js resolves {error} rather
+    // than throwing, so a bare try/catch here would leave the card showing a
+    // stale time with nothing anywhere saying why — the exact failure being
+    // fixed, one layer down.
+    const { error: runErr } = await supabase.from('gcal_sync_runs').insert({
+      source: 'manual', ok: true, status_code: 200, response: payload,
     });
+    // A missing audit row must never fail a sync that worked, so it is logged
+    // and the sync still returns its real result.
+    if (runErr) console.error('gcal-sync: could not record the manual run', runErr.message);
+
+    return NextResponse.json(payload);
   } catch (e: any) {
     const msg = e.message || String(e);
-    if (msg.includes('disabled') || msg.includes('not connected')) {
-      return NextResponse.json({ skipped: true, reason: msg });
+    const skipped = msg.includes('disabled') || msg.includes('not connected');
+    // A sync that failed is the one the card most needs to know about, so it is
+    // recorded on the way out as well. Best-effort, and never allowed to
+    // replace the real error with a logging one.
+    try {
+      const { error: logErr } = await getServiceClient().from('gcal_sync_runs').insert({
+        source: 'manual',
+        ok: skipped ? true : false,
+        status_code: skipped ? 200 : 500,
+        response: skipped ? { skipped: true, reason: msg } : null,
+        error: skipped ? null : msg.slice(0, 500),
+      });
+      if (logErr) console.error('gcal-sync: could not record the failed run', logErr.message);
+    } catch (logThrew) {
+      // Getting the service client can itself throw. The sync's own error below
+      // is what the caller needs; this one only ever goes to the server log.
+      console.error('gcal-sync: could not record the failed run', logThrew);
     }
+    if (skipped) return NextResponse.json({ skipped: true, reason: msg });
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

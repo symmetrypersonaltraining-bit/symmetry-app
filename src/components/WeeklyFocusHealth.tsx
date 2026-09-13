@@ -19,7 +19,7 @@
 // RLS does the multi-trainer scoping: he sees his clients, Stephanie sees hers,
 // and each gets a count that means something to them.
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 function todayCT(): string {
@@ -52,10 +52,10 @@ interface Row {
 export default function WeeklyFocusHealth() {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
 
-  useEffect(() => {
-    let on = true;
-    (async () => {
+  const load = useCallback(async () => {
       try {
         const sup = createClient() as any;
         const { data } = await sup
@@ -63,14 +63,55 @@ export default function WeeklyFocusHealth() {
           .select("id, name, weekly_focus, weekly_focus_week, weekly_focus_source")
           .is("archived_at", null)
           .order("name");
-        if (on) setRows((data || []) as Row[]);
+        setRows((data || []) as Row[]);
       } catch {
         /* never break the home screen over a status widget */
-        if (on) setRows([]);
+        setRows([]);
       }
-    })();
-    return () => { on = false; };
   }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  // ── THE CARD THAT REPORTS THE FAILURE CAN NOW FIX IT ──────────────────────
+  //
+  // Dustin, 13 Sep: "it tells me clients need focus and shows me drafts when I
+  // click but doesn't give me any options to regenerate or activate the
+  // drafts."
+  //
+  // /api/cron/weekly-ai has taken a signed-in trainer POST for weeks — the
+  // owner may sweep the whole roster — so the capability was already there and
+  // simply had no control wired to it. Until now his only remedies were to wait
+  // for Saturday or to go and read a cron log, which is what this card tells
+  // him to do three lines further down.
+  //
+  // The sweep does not overwrite a line the trainer wrote himself: a client
+  // whose focus is his comes back "focus-kept". So this only fills the gaps.
+  async function sweep() {
+    if (busy) return;
+    setBusy(true);
+    setNote("");
+    try {
+      const r = await fetch("/api/cron/weekly-ai", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) {
+        const wrote = Array.isArray(j?.results)
+          ? j.results.filter((x: { status?: string }) => x?.status === "written").length
+          : null;
+        setNote(wrote != null ? `Wrote ${wrote} line${wrote === 1 ? "" : "s"}.` : "Done.");
+        await load();
+      } else {
+        setNote(String(j?.error || "That didn't run — try again in a moment."));
+      }
+    } catch {
+      setNote("That didn't run — check your connection and try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   if (!rows || rows.length === 0) return null;
 
@@ -157,6 +198,28 @@ export default function WeeklyFocusHealth() {
           )}
         </div>
       )}
+
+      {/* One model call per client, so it says it is running and refuses a
+          second tap while it does. */}
+      <div className="mt-2 flex items-center gap-2 flex-wrap">
+        <button
+          onClick={sweep}
+          disabled={busy}
+          className="text-xs font-semibold rounded-lg"
+          style={{
+            padding: "6px 11px",
+            background: busy ? "var(--brand-bg)" : tone,
+            color: busy ? "var(--brand-text-secondary)" : "#fff",
+            border: "none",
+            cursor: busy ? "default" : "pointer",
+          }}
+        >
+          {busy ? "Writing…" : "Write the missing ones"}
+        </button>
+        {note && (
+          <span className="text-xs" style={{ color: "var(--brand-text-secondary)" }}>{note}</span>
+        )}
+      </div>
 
       {partial && (
         <div className="text-xs mt-2" style={{ color: tone }}>
