@@ -95,6 +95,16 @@ export function creditHealth(input: {
   /** Days the spend rows cover, for the burn rate. */
   windowDays: number;
   lastFailure?: { at: string; feature: string | null; error: string | null } | null;
+  /**
+   * The most recent AI call that SUCCEEDED. A success after the refusal is
+   * proof the account is working again — better proof than any bookkeeping.
+   */
+  lastSuccessAt?: string | null;
+  /**
+   * When a top-up was last recorded. He pressed "I added credit — record it";
+   * that is a statement about the account, and it is dated.
+   */
+  lastTopUpAt?: string | null;
   now?: number;
 }): CreditHealth {
   const now = input.now ?? Date.now();
@@ -102,9 +112,35 @@ export function creditHealth(input: {
   const added = input.topUps.reduce((a, t) => a + (Number(t.amount_usd) || 0), 0);
   const perDay = input.windowDays > 0 ? spent / input.windowDays : 0;
 
+  // ── A REFUSAL IS ONLY LIVE UNTIL SOMETHING DISPROVES IT ────────────────────
+  //
+  // Dustin, 13 Sep 5:33pm: *"I added but the notification won't clear."* He had
+  // topped the account up and pressed "I added credit — record it", and the red
+  // banner stayed, because the only thing that cleared an outage was the
+  // refusal ageing out of a six-hour window. The button recorded a row that
+  // nothing read. A card telling you to fix something you have already fixed is
+  // a card you learn to ignore — which is precisely what this one cannot afford.
+  //
+  // Two things disprove a refusal, and both are events with times on them:
+  //
+  //   A SUCCESS AFTER IT — the strongest possible evidence, and free: the same
+  //   ai_usage_log that records the failure records every call that worked.
+  //
+  //   A TOP-UP RECORDED AFTER IT — his own statement that he has dealt with it.
+  //   If he is wrong, the next AI call fails and the banner is back within
+  //   seconds. Self-correcting, which is what makes it safe to believe him.
+  //
+  // Deliberately NOT "the ledger says there is money": that arithmetic being
+  // wrong is the whole reason the outage signal exists and outranks it.
+  const failedAt = input.lastFailure ? Date.parse(input.lastFailure.at) : NaN;
+  const disprovedBy = (iso: string | null | undefined) =>
+    !!iso && Number.isFinite(failedAt) && Date.parse(iso) > failedAt;
+
   const outage =
     input.lastFailure && isBillingFailure(input.lastFailure.error) &&
-    now - Date.parse(input.lastFailure.at) <= OUTAGE_WINDOW_MS
+    now - failedAt <= OUTAGE_WINDOW_MS &&
+    !disprovedBy(input.lastSuccessAt) &&
+    !disprovedBy(input.lastTopUpAt)
       ? { at: input.lastFailure.at, feature: input.lastFailure.feature }
       : null;
 

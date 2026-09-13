@@ -4445,3 +4445,38 @@ already have been done on a day that has not happened, and the refusal says so.
 | "I did a hike" — not on the plan | `log_a_workout_i_did` |
 | "I DID do Friday's session" — it was scheduled, app says missed | `i_did_do_that` |
 | "Add another walk on Saturday" — from their library | `add_my_workout` |
+
+### Trainer home — the AI credit card, and when it stands down (13 Sep 2026)
+
+Dustin, 5:33pm: *"I added but the notification won't clear."*
+
+He had topped the account up and pressed **I added credit — record it**, and the
+red card still read "Every AI feature is down — the account is out of credit".
+
+**What the log actually showed:**
+
+| time (CT) | what happened |
+|---|---|
+| 11:24–11:36 | five real billing refusals |
+| **15:12** | **coach_action succeeds — the AI is working again** |
+| 17:33:09 | he records a $30 top-up |
+| 17:33 | the card still says every feature is down |
+| 17:41 | another success |
+
+The card was wrong for **two and a half hours**, through three successful calls
+and a top-up, because the only thing that could clear an outage was the refusal
+ageing out of a six-hour window. It would have cleared itself at 17:36:56 — four
+minutes after he complained — by expiry rather than by knowing anything. The
+button he pressed wrote a row nothing read.
+
+**What the control does now.** A refusal stands as a live outage only until
+something with a later timestamp disproves it:
+
+- **a call that SUCCEEDED since** — proof the key works, free, already in
+  `ai_usage_log`; or
+- **a top-up recorded since** — his own statement that he has dealt with it.
+
+Both are compared against the refusal's time, so an older top-up or an earlier
+success never suppresses a newer refusal. Believing the button is safe because
+it is self-correcting: if the credit did not actually land, the next AI call
+fails and the card is back within seconds.
