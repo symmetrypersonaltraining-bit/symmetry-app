@@ -101,6 +101,25 @@ describe("the credit banner clears when you fix it", () => {
     assert.ok(h.outage, "a success that predates the refusal is not evidence");
   });
 
+  it("a later unrelated failure cannot mask a live billing refusal", () => {
+    // The other direction of the same comparison, and it silences the card at
+    // exactly the wrong moment. At 17:41 on 13 Sep the newest error row was
+    // "No valid JSON after 2 attempts" — not a billing problem — sitting on top
+    // of five real refusals. `limit(1)` over all errors would have picked it,
+    // isBillingFailure would have said false, and the outage would have
+    // vanished while the account was still empty.
+    assert.doesNotMatch(
+      ROUTE,
+      /\.neq\("error", ""\)[\s\S]{0,120}\.limit\(1\)/,
+      "the route takes the most recent error of ANY kind again — a JSON parse " +
+        "failure will hide a billing refusal behind it",
+    );
+    assert.match(ROUTE, /isBillingFailure/,
+      "it must pick the most recent BILLING refusal, using the one definition of that");
+    assert.match(ROUTE, /OUTAGE_WINDOW_MS/,
+      "and bound the scan to the window rather than reading the whole table");
+  });
+
   it("the route actually fetches both, or the logic above never sees them", () => {
     assert.match(ROUTE, /lastSuccessAt/, "the route must pass the last success through");
     assert.match(ROUTE, /lastTopUpAt/, "…and the last top-up");

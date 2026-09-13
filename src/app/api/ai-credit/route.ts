@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getServerUser } from "@/lib/auth/serverUser";
 import { viewerIsTrainer } from "@/lib/auth/viewer";
-import { creditHealth, type SpendRow, type TopUp } from "@/lib/ai/creditHealth";
+import { creditHealth, isBillingFailure, OUTAGE_WINDOW_MS, type SpendRow, type TopUp } from "@/lib/ai/creditHealth";
 import { fetchAllRows } from "@/lib/fetchAllRows";
 
 /**
@@ -74,14 +74,31 @@ export async function GET() {
 
     // The provider's own refusal, most recent first. Exact, and independent of
     // anything he has or has not written down.
+    // ── THE MOST RECENT BILLING REFUSAL, NOT THE MOST RECENT ERROR ──────────
+    //
+    // This used to take `limit(1)` over every error row and then ask whether
+    // THAT one was about billing. So any later failure of any other kind hid a
+    // live outage: at 17:41 on 13 Sep the newest error was "No valid JSON after
+    // 2 attempts", which is not a billing problem, and it would have masked the
+    // real refusals behind it. The card would have gone quiet at exactly the
+    // moment it is supposed to shout.
+    //
+    // Found while fixing the opposite fault — the same comparison over-reporting
+    // an outage that was already over. One signal, wrong in both directions.
+    //
+    // Scanned rather than filtered in SQL so `isBillingFailure` stays the single
+    // definition of what counts. A second copy of that pattern as a chain of
+    // ilikes is how the two drift apart. Bounded by the outage window and a row
+    // cap, so it reads a handful of rows at most.
     const { data: failRows } = await db
       .from("ai_usage_log")
       .select("created_at, feature, error")
       .not("error", "is", null)
       .neq("error", "")
+      .gte("created_at", new Date(Date.now() - OUTAGE_WINDOW_MS).toISOString())
       .order("created_at", { ascending: false })
-      .limit(1);
-    const last = failRows?.[0];
+      .limit(200);
+    const last = (failRows || []).find((r) => isBillingFailure(r.error));
 
     // ── WHAT DISPROVES THAT REFUSAL ─────────────────────────────────────────
     //
