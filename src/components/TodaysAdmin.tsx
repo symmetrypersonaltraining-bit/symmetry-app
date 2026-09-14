@@ -34,6 +34,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { moneyBuckets, moneySub, needsAttention, type ReminderRow } from "@/lib/payments/adminMoney";
 
 type Tone = "crit" | "warn" | "good";
 
@@ -174,7 +175,12 @@ export default function TodaysAdmin() {
           // Money: sent-but-unconfirmed AND ready-to-send. Dustin, 21 Aug:
           // "for upcoming payments keep add payments sent out that have not
           // been confirmed paid yet on there."
-          sb.from("payment_reminders").select("due_date, reminder_sent_at, client_ack_at, paid_confirmed_at"),
+          //
+          // notification_status is not optional here. Without it this row spent
+          // two months telling him nine already-paid invoices were "ready to
+          // send" — see lib/payments/adminMoney.ts, which now does the sorting.
+          sb.from("payment_reminders")
+            .select("due_date, reminder_sent_at, client_ack_at, paid_confirmed_at, notification_status"),
           // Notes, minus the classes that close themselves.
           sb.from("exercise_notes").select("note").not("resolved", "is", true),
           // Programming coverage — ONE ROW PER CLIENT, computed in the database.
@@ -229,13 +235,7 @@ export default function TodaysAdmin() {
           .map((r) => ({ id: r.client_id, name: r.client_name }));
 
         // ── money ────────────────────────────────────────────────────────────
-        const pr = (pays.data || []) as {
-          due_date: string; reminder_sent_at: string | null;
-          client_ack_at: string | null; paid_confirmed_at: string | null;
-        }[];
-        const awaiting = pr.filter((p) => p.reminder_sent_at && !p.paid_confirmed_at && !p.client_ack_at);
-        const toSend = pr.filter((p) => !p.reminder_sent_at && p.due_date <= addDays(today, 7));
-        const overdue = awaiting.filter((p) => p.due_date < today);
+        const money = moneyBuckets((pays.data || []) as ReminderRow[], today);
 
         // ── notes ────────────────────────────────────────────────────────────
         const realNotes = ((notes.data || []) as { note: string }[]).filter((n) => !ROUTINE.test((n.note || "").trim()));
@@ -262,15 +262,15 @@ export default function TodaysAdmin() {
           href: "/schedule/proposals", cta: "Review",
         });
 
-        if (overdue.length || awaiting.length || toSend.length) out.push({
+        // Provisional invoices are named in the sentence but cannot raise this
+        // row on their own — he is not allowed to send them yet, so counting
+        // them as admin would make the row permanent, and permanent is invisible.
+        if (needsAttention(money)) out.push({
           key: "money",
-          tone: overdue.length ? "crit" : "warn",
-          title: overdue.length ? "Payments overdue" : "Payments outstanding",
-          count: String(overdue.length || awaiting.length),
-          sub:
-            (overdue.length ? overdue.length + " past due and unconfirmed. " : "") +
-            (awaiting.length - overdue.length > 0 ? (awaiting.length - overdue.length) + " sent, not confirmed paid. " : "") +
-            (toSend.length ? toSend.length + " ready to send." : ""),
+          tone: money.overdue.length ? "crit" : "warn",
+          title: money.overdue.length ? "Payments overdue" : "Payments outstanding",
+          count: String(money.overdue.length || money.awaiting.length || money.toSend.length),
+          sub: moneySub(money, today),
           href: "/payments", cta: "Payments",
         });
 
