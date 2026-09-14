@@ -4609,10 +4609,15 @@ wrapped, and a browser that refuses `pushState` degrades to the old behaviour
 (Back leaves the page) rather than throwing. Nothing touches sets, reps or
 weights.
 
-**Still to do — trainer-side modals:** New client, Assign program, Invite
-client, Workout day editor, Schedule board, Recipes, Exercise library, Messages,
-Payments, Trainer calendar, Saturday review, Trainer week digest. Same hook,
-same one-line change; they are desktop-first, which is why they are second.
+**Trainer-side, done the same evening:** New client, Assign program, Invite
+client (the QR), Schedule edit drawer, Payments confirm, Recipe view, Exercise
+drawer, Saturday review.
+
+**Still open:** Workout day editor, Schedule board, Messages, Trainer calendar
+(three separate drawers in one file), Trainer week digest. Each needs its own
+look rather than a blind one-liner — they hold several overlays apiece and some
+are views rather than modals.
+
 Takeovers (`ClientTakeovers`, `AssessmentGate`, `AiLimitTakeover`) are
 deliberately excluded — a gate that Back dismisses is not a gate.
 

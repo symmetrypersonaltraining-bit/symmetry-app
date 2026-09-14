@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import QRCode from "qrcode";
+import { useBackClosesOverlay } from "@/lib/nav/useBackClosesOverlay";
 
 export default function InviteClientButton({
   clientId,
@@ -17,6 +18,9 @@ export default function InviteClientButton({
   // The in-studio path. Dustin is standing next to them — a QR they scan off his
   // phone beats an email that lands in spam and a password they have to type.
   const [qr, setQr] = useState<string | null>(null);
+
+  // Back closes this rather than leaving the page — lib/nav/useBackClosesOverlay.ts.
+  useBackClosesOverlay(qr ? 1 : 0, () => setQr(null));
 
   async function handleInvite() {
     if (state !== "idle") return;

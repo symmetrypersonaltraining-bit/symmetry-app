@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useBackClosesOverlay } from "@/lib/nav/useBackClosesOverlay";
 
 const EXPERIENCE_LEVELS = ["Beginner", "Intermediate", "Advanced", "Athlete"];
 const GOALS = [
@@ -18,6 +19,9 @@ export default function NewClientModal({ onClose }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Back closes this rather than leaving the page — lib/nav/useBackClosesOverlay.ts.
+  useBackClosesOverlay(1, onClose);
 
   const [form, setForm] = useState({
     name: "",

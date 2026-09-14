@@ -23,6 +23,7 @@ import { useCallback, useEffect, useState } from "react";
 import { fx } from "@/lib/fx";
 import AiBadge from "@/components/AiBadge";
 import { centralHour } from "@/lib/central-time";
+import { useBackClosesOverlay } from "@/lib/nav/useBackClosesOverlay";
 
 interface Draft {
   id: string;
@@ -49,6 +50,9 @@ export default function SaturdayReview() {
   const [week, setWeek] = useState<string>("");
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+
+  // Back closes this rather than leaving the page — lib/nav/useBackClosesOverlay.ts.
+  useBackClosesOverlay(open ? 1 : 0, () => setOpen(false));
   const [editing, setEditing] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {

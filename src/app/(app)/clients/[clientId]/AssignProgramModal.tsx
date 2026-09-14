@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { useBackClosesOverlay } from "@/lib/nav/useBackClosesOverlay";
 
 interface Program {
   id: string;
@@ -23,6 +24,9 @@ export default function AssignProgramModal({ clientId, clientName, programs, cur
   const [startDate, setStartDate] = useState(new Date().toLocaleDateString("en-CA", { timeZone: "America/Chicago" })); // Central, not UTC: after 7pm Central the UTC date is already tomorrow
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Back closes this rather than leaving the page — lib/nav/useBackClosesOverlay.ts.
+  useBackClosesOverlay(1, onClose);
   const router = useRouter();
   const supabase = createClient();
 

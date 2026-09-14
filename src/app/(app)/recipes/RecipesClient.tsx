@@ -44,6 +44,7 @@ import {
   perServing, recipeTotals, validateRecipe, visibilityLabel,
   type RecipeIngredient, type RecipeVisibility,
 } from "@/lib/recipes";
+import { useBackClosesOverlay } from "@/lib/nav/useBackClosesOverlay";
 
 interface RecipeRow {
   id: string;
@@ -279,6 +280,9 @@ function RecipeView({ rec, planMeals, onClose }: { rec: RecipeRow; planMeals: { 
   const { firstName: coachFirstName } = useCoach();
   const [ings, setIngs] = useState<{ food: string; amount: number | null; unit: string | null; protein: number; carbs: number; fats: number; source: string; note: string | null }[] | null>(null);
   const supabase = useMemo(() => createClient(), []);
+
+  // Back closes this rather than leaving the page — lib/nav/useBackClosesOverlay.ts.
+  useBackClosesOverlay(1, onClose);
   // Logging it is the point of having cooked it.
   const [howMany, setHowMany] = useState("1");
   const [logging, setLogging] = useState(false);
