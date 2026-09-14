@@ -1,22 +1,30 @@
 "use client";
 
 // Nutrition v3 — live barcode scanner overlay (nested above the food sheet).
-// Native BarcodeDetector + getUserMedia rear camera → requestAnimationFrame
-// detect loop. Graceful fallbacks: browsers without BarcodeDetector (e.g. iOS
-// Safari) and denied/errored camera get a manual "enter barcode number" input
-// that runs the same lookup. The camera stream is always torn down on decode,
-// close, or unmount — no leaked getUserMedia tracks.
+//
+// THE CAMERA COMES UP ON EVERY PHONE, NOT JUST CHROME FOR ANDROID.
+//
+// Dustin, 14 Sep 2026: "Edit items bar code scanner doesn't work chevk the
+// log." His user agent, recorded four days earlier by an unrelated crash, ends
+// `; wv)` — Android WebView, not Chrome. This screen was built on
+// BarcodeDetector, which Chrome for Android has and WebView does not, and which
+// iOS Safari has never had. So the camera was never started for him, or for any
+// iPhone client, and the scanner opened straight onto the "type the number in"
+// fallback. That is what "doesn't work" was.
+//
+// lib/nutrition/barcodeDecode.ts now hands back a decoder either way: the
+// native one where it exists, and a ZXing decode of the frame everywhere else.
+// This file stopped caring which. It also reports, to app_error_log under scope
+// "barcode", every reason the camera does not come up — so "check the log" has
+// an answer next time instead of silence.
+//
+// The camera stream is still always torn down on decode, close, or unmount —
+// no leaked getUserMedia tracks.
 
 import { useEffect, useRef, useState } from "react";
 
-// BarcodeDetector isn't in the TS DOM lib yet — minimal shapes for what we use.
-type DetectedBarcode = { rawValue: string };
-interface BarcodeDetectorLike {
-  detect(source: CanvasImageSource): Promise<DetectedBarcode[]>;
-}
-type BarcodeDetectorCtor = new (opts?: { formats?: string[] }) => BarcodeDetectorLike;
-
-const FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"];
+import { createDecoder, type BarcodeDetectorLike, type DecoderKind } from "@/lib/nutrition/barcodeDecode";
+import { logAppError } from "@/lib/logAppError";
 
 /**
  * HOW MANY TIMES THE SAME CODE HAS TO BE READ BEFORE WE BELIEVE IT.
@@ -32,7 +40,8 @@ const FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"];
  * product you never scanned.
  *
  * Three agreeing frames is fast when the barcode is actually in the reticle
- * (about a twentieth of a second) and effectively never happens by accident.
+ * (about a twentieth of a second on the native detector, a third of a second on
+ * the ZXing fallback) and effectively never happens by accident.
  */
 const CONFIRMATIONS = 3;
 
@@ -55,12 +64,6 @@ function checkDigitOk(code: string): boolean {
   return (10 - (sum % 10)) % 10 === check;
 }
 
-function detectorCtor(): BarcodeDetectorCtor | null {
-  if (typeof window === "undefined") return null;
-  const w = window as unknown as { BarcodeDetector?: BarcodeDetectorCtor };
-  return w.BarcodeDetector ?? null;
-}
-
 type Status = "starting" | "scanning" | "denied" | "error";
 
 const CORNERS = [
@@ -69,6 +72,23 @@ const CORNERS = [
   { v: "bottom", h: "left", br: "0 0 0 18px" },
   { v: "bottom", h: "right", br: "0 0 18px 0" },
 ] as const;
+
+/**
+ * What the browser could offer, recorded alongside every failure. Which of
+ * these is false is the whole diagnosis: no mediaDevices at all means an
+ * insecure context or a WebView whose host app was never granted the camera,
+ * and that is a different fix from a permission the user declined.
+ */
+function environment(): Record<string, unknown> {
+  if (typeof window === "undefined") return {};
+  const nav = navigator as Navigator & { mediaDevices?: MediaDevices };
+  return {
+    has_barcode_detector: "BarcodeDetector" in window,
+    has_media_devices: typeof nav.mediaDevices?.getUserMedia === "function",
+    secure_context: window.isSecureContext,
+    standalone: window.matchMedia?.("(display-mode: standalone)").matches ?? null,
+  };
+}
 
 export default function BarcodeScanner({
   onDetected,
@@ -85,8 +105,8 @@ export default function BarcodeScanner({
   // The code seen on the last frame, and how many frames in a row have agreed.
   const seenRef = useRef<{ code: string; n: number }>({ code: "", n: 0 });
 
-  const supported = typeof window !== "undefined" && detectorCtor() != null;
-  const [status, setStatus] = useState<Status>(supported ? "starting" : "error");
+  const [status, setStatus] = useState<Status>("starting");
+  const [decoder, setDecoder] = useState<DecoderKind | null>(null);
   const [manual, setManual] = useState("");
 
   // Idempotent full teardown — safe to call from decode, close, and unmount.
@@ -137,14 +157,54 @@ export default function BarcodeScanner({
   }
 
   useEffect(() => {
-    const Ctor = detectorCtor();
-    if (!Ctor) return; // no BarcodeDetector → manual-entry fallback, no camera
     let cancelled = false;
 
+    /** One row per reason the camera did not come up. */
+    const report = (stage: string, err: unknown, kind: DecoderKind | null) => {
+      const e = (err || {}) as { name?: string; message?: string; stack?: string };
+      logAppError({
+        scope: "barcode",
+        error: {
+          name: e.name ?? null,
+          // The stage leads the message because the fingerprint groups on it:
+          // "camera denied" and "no decoder" must not land on the same row.
+          message: `${stage} — ${e.name || e.message || "no detail"}`,
+          stack: e.stack,
+        },
+        detail: { stage, decoder: kind, ...environment() },
+      });
+    };
+
     (async () => {
+      // 1. A DECODER. Native where the browser has one, ZXing otherwise. The
+      //    ZXing chunk is fetched here, which is why "Starting camera…" can sit
+      //    for a moment on a slow connection the first time.
+      let kind: DecoderKind;
       try {
-        detectorRef.current = new Ctor({ formats: FORMATS });
-        const stream = await navigator.mediaDevices.getUserMedia({
+        const dec = await createDecoder();
+        if (cancelled || doneRef.current) return;
+        kind = dec.kind;
+        detectorRef.current = dec.detector;
+        setDecoder(dec.kind);
+      } catch (e) {
+        if (cancelled) return;
+        setStatus("error");
+        report("no decoder", e, null);
+        return;
+      }
+
+      // 2. A CAMERA.
+      try {
+        const nav = navigator as Navigator & { mediaDevices?: MediaDevices };
+        if (typeof nav.mediaDevices?.getUserMedia !== "function") {
+          // Not an exception the browser threw — an API that is not there at
+          // all, which is what an insecure origin or a locked-down WebView
+          // looks like. Named so the log can tell it apart from a refusal.
+          throw Object.assign(new Error("mediaDevices.getUserMedia unavailable"), {
+            name: "NoCameraApiError",
+          });
+        }
+        const stream = await nav.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: "environment" } },
           audio: false,
         });
@@ -192,7 +252,9 @@ export default function BarcodeScanner({
       } catch (e) {
         if (cancelled) return;
         const name = (e as { name?: string })?.name;
-        setStatus(name === "NotAllowedError" || name === "SecurityError" ? "denied" : "error");
+        const denied = name === "NotAllowedError" || name === "SecurityError";
+        setStatus(denied ? "denied" : "error");
+        report(denied ? "camera denied" : "camera unavailable", e, kind);
       }
     })();
 
@@ -288,26 +350,23 @@ export default function BarcodeScanner({
         </div>
       )}
 
-      {/* Fallback: no camera (unsupported / denied / error) → manual entry */}
+      {/* Fallback: the camera itself could not be opened → manual entry */}
       {showManual && (
         <div className="flex-1 flex flex-col justify-center px-6">
-          {status === "denied" && (
-            <p className="text-sm mb-4 text-center" style={{ color: "rgba(255,255,255,0.85)" }}>
-              We couldn't access the camera. Allow camera access in your browser settings to scan,
-              or type the barcode number below.
-            </p>
-          )}
-          {status === "error" && (
-            <p className="text-sm mb-4 text-center" style={{ color: "rgba(255,255,255,0.85)" }}>
-              {supported
-                ? "The camera isn't available on this device — type the barcode number below."
-                : "Live scan isn't supported in this browser — type the barcode number below."}
-            </p>
-          )}
-          <ManualEntry manual={manual} setManual={setManual} onSubmit={() => finish(manual)} />
-          <p className="text-xs mt-4 text-center" style={{ color: "rgba(255,255,255,0.5)" }}>
-            Live scan works best on Android / Chrome.
+          <p className="text-sm mb-4 text-center" style={{ color: "rgba(255,255,255,0.85)" }}>
+            {status === "denied"
+              ? "We couldn't access the camera. Allow camera access for this app in your phone's settings to scan, or type the barcode number below."
+              : "The camera isn't available on this device — type the barcode number below."}
           </p>
+          <ManualEntry manual={manual} setManual={setManual} onSubmit={() => finish(manual)} />
+          {/* No "works best on Android / Chrome" line any more. It was true of
+              the old build and is not of this one, and a tutorial-grade promise
+              that is out of date is worse than none. */}
+          {decoder === "zxing" && (
+            <p className="text-xs mt-4 text-center" style={{ color: "rgba(255,255,255,0.5)" }}>
+              You can also find the number printed under the bars.
+            </p>
+          )}
         </div>
       )}
     </div>

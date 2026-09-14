@@ -32,7 +32,12 @@ export type AppErrorScope =
   | "render"          // a React error boundary caught it
   | "unhandled"       // window.onerror
   | "rejection"       // an unhandled promise rejection
-  | "server";         // an API route reported its own failure
+  | "server"          // an API route reported its own failure
+  // 14 Sep. "Edit items bar code scanner doesn't work chevk the log" — and the
+  // log had nothing, because the scanner had never written to it. Every reason
+  // the camera does not come up is a row now, carrying which decoder was in
+  // play, so the next report of this is answered from the table.
+  | "barcode";
 
 /** fingerprint → last time it was sent from this page. */
 const sentAt = new Map<string, number>();
