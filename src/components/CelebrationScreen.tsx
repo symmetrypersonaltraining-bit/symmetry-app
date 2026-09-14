@@ -2,11 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Confetti from "./Confetti";
-import { loadLabel } from "@/lib/loadDirection";
 import Link from "next/link";
 import CountUp from "@/components/CountUp";
-import ShareToGroup from "@/components/ShareToGroup";
-import { sendGroupMessage } from "@/app/(app)/home/messageActions";
 import { fx } from "@/lib/fx";
 
 import { useCoach } from "@/lib/useCoach";
@@ -161,10 +158,13 @@ export default function CelebrationScreen({
   //
   // Two of the cards below were a PHOTOGRAPH OF DUSTIN, hardcoded:
   // /coach-flex.webp on variant 26 (roughly 1 completed session in 38, every
-  // client in the app) and /coach-head.webp on every big PR, which overrides
+  // client in the app) and /coach-head.webp on every big PR, which overrode
   // whichever variant rolled. A client of Stephanie's finished a workout and
   // got a full-screen picture of a man they have never met, captioned COACH
   // APPROVED.
+  //
+  // The head one is GONE (14 Sep) — see the note where it used to be. The flex
+  // card stays, and everything below about whose face still applies to it.
   //
   // Those two files are cutouts of the owner specifically, so they are used
   // only for the owner. Any other coach gets their own round avatar in the same
@@ -277,42 +277,43 @@ export default function CelebrationScreen({
   const unit = units[(seed + reroll) % units.length];
   const unitCount = Math.max(1, Math.round(volume / unit[1]));
 
-  const shareText = topPr
-    ? `🏆 ${firstName} just hit a PR — ${topPr.movement} ${loadLabel(topPr.weight, !!topPr.assistance)} × ${topPr.reps}` +
-      (topPr.previous ? ` (was ${loadLabel(topPr.previous, !!topPr.assistance)})` : "")
-    : `💪 ${firstName} just finished ${dayLabel || "a session"} — ${setCount} sets, ${vStr} lb moved` +
-      (dustins ? ` — that's ${dustins} coach ${coachName}${dustins === 1 ? "" : "s"}.` : ".");
-  // ── PR auto-share ────────────────────────────────────────────────────────
-  // The coach: PRs go to the group on their own, with no notification.
+  // `shareText` lived here and composed the group-chat post. Both the things
+  // that read it are gone (14 Sep), so it went with them rather than being
+  // left as a string nobody sends.
+  // ── PR AUTO-SHARE: REMOVED, 14 Sep 2026 ─────────────────────────────────
   //
-  // The Share button stays — sharing an ordinary session is still a choice —
-  // but a PR is the thing most worth the group seeing and the thing a client is
-  // least likely to broadcast about themselves. Waiting for them to tap means
-  // the best moments never make it into the thread.
+  // Dustin: *"get rid of sharing the prs n completed workout options for group
+  // chat. This will need to be adjusted in celebration screen at end of
+  // workouts to remove that option as well."*
   //
-  // Silent on purpose: the message lands in the group and shows as unread, but
-  // does not push. Buzzing thirty-five phones every time someone hits a PR is
-  // how a group chat gets muted, and a muted group chat ends the whole feature.
+  // A PR used to post itself into the group thread the moment this screen
+  // rendered — silently, with no way for the client to decline, and with a
+  // sessionStorage key per PR so it could not be undone by closing the screen.
+  // The whole mechanism is gone: the effect, the key, and the "Posted to the
+  // group" line that told them it had happened.
   //
-  // Guarded by a per-PR key in sessionStorage so a re-render, a back-navigation
-  // or a second look at the celebration cannot post it twice.
-  useEffect(() => {
-    if (!topPr) return;
-    const key =
-      "sym:prshare:" + (clientId || "me") + ":" + topPr.movement + ":" + topPr.weight + ":" + topPr.reps;
-    try {
-      if (sessionStorage.getItem(key)) return;
-      sessionStorage.setItem(key, "1");
-    } catch {
-      return; // no storage = no idempotency guarantee = don't post
-    }
-    void sendGroupMessage(shareText, null, true).catch(() => {
-      try { sessionStorage.removeItem(key); } catch { /* noop */ }
-    });
-    // shareText is derived from topPr; keying on topPr alone keeps this to one
-    // run per PR rather than one per re-render of the rotating copy.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [topPr?.movement, topPr?.weight, topPr?.reps, clientId]);
+  // This is the first half of the group chat becoming a Community — see the
+  // note in docs/audit/AI-WALK-NOTES.md. Nothing the app decides is worth
+  // saying should land in a shared thread on the client's behalf.
+
+  // ── EVERY CARD WEARS A FACE ─────────────────────────────────────────────
+  //
+  // Dustin, 14 Sep 2026: *"I want all those celebrations to have an avatar.
+  // Those screens need to look polished n professional, fun, encouraging."*
+  //
+  // Ten of the thirty-seven had one and twenty-seven did not, so the rotation
+  // swung between a card with a character on it and a bare slab of copy — which
+  // reads as two different apps rather than one with a sense of humour.
+  //
+  // ONE MOOD FOR THE WHOLE SCREEN, resolved here rather than per card. The face
+  // reacts to what actually happened in the session — a PR, a long streak, a
+  // goal hit — and not to the joke the card happens to be telling. A card that
+  // picked its own mood would have the avatar celebrating a PR on a day there
+  // was not one.
+  const cardMood = winMood({ isPr: prCount > 0, streakDays, hitGoal: bigPr, fullDayLogged: true });
+  const CardFace = () => (
+    <div style={{ marginBottom: 12 }}><Face mood={cardMood} size={52} /></div>
+  );
 
   const headline = HEADLINES[(seed + tapIdx) % HEADLINES.length];
   const fortune = FORTUNES[(seed + tapIdx) % FORTUNES.length];
@@ -368,9 +369,10 @@ export default function CelebrationScreen({
 
   let content: React.ReactNode = null;
 
-  if (variant === 0) {
+  if (variant === 0) {0
     content = (
       <div style={bigCard}>
+        <CardFace />
         {confetti(24)}
         <span style={bnBand}>🔴 BREAKING NEWS</span>
         <div style={bnHead}>
@@ -382,9 +384,10 @@ export default function CelebrationScreen({
         </button>
       </div>
     );
-  } else if (variant === 1) {
+  } else if (variant === 1) {1
     content = (
       <div style={bigCard}>
+        <CardFace />
         {confetti(16)}
         <div style={{ fontSize: 12, fontWeight: 800, color: "var(--brand-text-secondary)", letterSpacing: 1 }}>
           TODAY YOU LIFTED THE EQUIVALENT OF
@@ -403,9 +406,10 @@ export default function CelebrationScreen({
         </div>
       </div>
     );
-  } else if (variant === 2) {
+  } else if (variant === 2) {2
     content = (
       <div style={{ ...bigCard, justifyContent: "flex-start" }}>
+        <CardFace />
         <div style={stamp}>APPROVED</div>
         <div style={letter}>
           <div style={{ fontSize: 10, letterSpacing: 2, color: "#8a8163", fontWeight: 700 }}>
@@ -431,9 +435,10 @@ export default function CelebrationScreen({
         </div>
       </div>
     );
-  } else if (variant === 3) {
+  } else if (variant === 3) {3
     content = (
       <div style={{ ...bigCard, ...poster }}>
+        <CardFace />
         {confetti(20)}
         <div style={{ fontSize: 11, letterSpacing: 3, fontWeight: 800 }}>★ STEP RIGHT UP ★</div>
         <div style={{ fontSize: 24, fontWeight: 900, fontFamily: "Georgia, serif", margin: "6px 0", textTransform: "uppercase" }}>
@@ -455,9 +460,10 @@ export default function CelebrationScreen({
         </div>
       </div>
     );
-  } else if (variant === 4) {
+  } else if (variant === 4) {4
     content = (
       <div style={bigCard}>
+        <CardFace />
         <div style={{ fontSize: 12, fontWeight: 800, color: "var(--brand-text-secondary)", letterSpacing: 1, marginBottom: 8 }}>
           {cracked ? "YOUR LIFT FORTUNE" : "TAP THE COOKIE"}
         </div>
@@ -480,9 +486,10 @@ export default function CelebrationScreen({
         )}
       </div>
     );
-  } else if (variant === 5) {
+  } else if (variant === 5) {5
     content = (
       <div style={{ ...bigCard, background: "#1c2440" }}>
+        <CardFace />
         <div style={{ background: "#e53935", color: "#fff", fontWeight: 900, fontSize: 11, letterSpacing: 2, padding: "6px 12px", borderRadius: 8, animation: "cs-blink 1.1s infinite" }}>⚠️ EMERGENCY ALERT ⚠️</div>
         <div style={{ fontSize: 23, fontWeight: 900, color: "#fff", margin: "14px 0 8px" }}>SEVERE GAINS WARNING</div>
         <div style={{ fontSize: 13, color: "#cdd6f4", lineHeight: 1.6 }}>
@@ -491,9 +498,10 @@ export default function CelebrationScreen({
         <div style={{ fontSize: 11, color: "#8fa2d4", marginTop: 10 }}>Advisory in effect until the soreness subsides.</div>
       </div>
     );
-  } else if (variant === 6) {
+  } else if (variant === 6) {6
     content = (
       <div style={{ ...bigCard, background: "#124a2c" }}>
+        <CardFace />
         <div style={{ fontSize: 40 }}>🎙️</div>
         <div style={{ background: "#fff", borderRadius: 16, padding: 16, marginTop: 12, fontSize: 14, lineHeight: 1.55, fontStyle: "italic", color: "#1a2233" }}>
           {"\"UNBELIEVABLE, folks! " + setCount + " sets" + (prCount > 0 ? " — " + prCount + " personal record" + (prCount > 1 ? "s" : "") + " —" : "") + " and the crowd is ON THEIR FEET! I have been calling workouts for 30 years and I have NEVER — I need a moment…\""}
@@ -501,9 +509,10 @@ export default function CelebrationScreen({
         <div style={{ fontSize: 11.5, color: "#a7e3c3", marginTop: 10 }}>{"— Partner announcer: \"He is crying again, Jim.\""}</div>
       </div>
     );
-  } else if (variant === 7) {
+  } else if (variant === 7) {7
     content = (
       <div style={{ ...bigCard, background: "#2c421f" }}>
+        <CardFace />
         <div style={{ fontSize: 40 }}>🌿</div>
         <div style={{ color: "#eef4dd", fontSize: 14, lineHeight: 1.65, fontStyle: "italic", marginTop: 12 }}>
           {"…and here, in the fluorescent savanna, we observe " + firstName + " completing a " + setCount + "-set display. Note the determined grimace — behaviour seen only in apex lifters. Truly… remarkable."}
@@ -511,9 +520,10 @@ export default function CelebrationScreen({
         <div style={{ fontSize: 11, color: "#b7cf8f", marginTop: 10 }}>Narrated in a very soft British accent.</div>
       </div>
     );
-  } else if (variant === 8) {
+  } else if (variant === 8) {8
     content = (
       <div style={{ ...bigCard, background: "#2a2f3e" }}>
+        <CardFace />
         <div style={{ background: "#fffef5", width: 230, padding: 16, fontFamily: "'Courier New', monospace", fontSize: 12, textAlign: "left", color: "#222", boxShadow: "0 10px 30px rgba(0,0,0,.4)" }}>
           <div style={{ textAlign: "center", fontWeight: 700 }}>SYMMETRY FITNESS<br />★ OFFICIAL RECEIPT ★</div>
           <hr style={{ borderStyle: "dashed", margin: "8px 0" }} />
@@ -528,18 +538,20 @@ export default function CelebrationScreen({
         </div>
       </div>
     );
-  } else if (variant === 9) {
+  } else if (variant === 9) {9
     content = (
       <div style={{ ...bigCard, background: "#0a0a1a", fontFamily: "'Courier New', monospace" }}>
+        <CardFace />
         <div style={{ color: "#39ff88", fontSize: 20, fontWeight: 700, animation: "cs-blink 1s infinite" }}>★ NEW HIGH SCORE ★</div>
         <div style={{ color: "#ffe14d", fontSize: 38, fontWeight: 900, margin: "12px 0" }}><CountUp end={volume} duration={1400} /></div>
         <div style={{ color: "#77ddff", fontSize: 13, fontWeight: 700 }}>{"RANK #1 — " + firstName.toUpperCase()}</div>
         <div style={{ color: "#889", fontSize: 11, marginTop: 12 }}>INSERT PROTEIN TO CONTINUE</div>
       </div>
     );
-  } else if (variant === 10) {
+  } else if (variant === 10) {10
     content = (
       <div style={{ ...bigCard, background: "#3b2a1a" }}>
+        <CardFace />
         <div style={{ background: "#e8d5a9", border: "6px double #6b4a2a", padding: 16, color: "#4a3418", width: 240 }}>
           <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: 3 }}>WANTED</div>
           <div style={{ fontSize: 46, margin: "6px 0" }}>🏋️</div>
@@ -551,9 +563,10 @@ export default function CelebrationScreen({
         </div>
       </div>
     );
-  } else if (variant === 11) {
+  } else if (variant === 11) {11
     content = (
       <div style={{ ...bigCard, background: "#16223f" }}>
+        <CardFace />
         <div style={{ background: "#fff", borderRadius: 14, width: 250, textAlign: "left", overflow: "hidden" }}>
           <div style={{ background: "var(--brand-primary)", color: "#fff", padding: "10px 14px", fontWeight: 800, fontSize: 13 }}>SWOLE AIR ✈ FIRST CLASS</div>
           <div style={{ padding: "12px 14px", fontSize: 12, color: "#1a2233", lineHeight: 1.7 }}>
@@ -566,9 +579,10 @@ export default function CelebrationScreen({
         </div>
       </div>
     );
-  } else if (variant === 12) {
+  } else if (variant === 12) {12
     content = (
       <div style={{ ...bigCard, background: "#2c1e4d" }}>
+        <CardFace />
         <div style={{ color: "#ffe14d", fontSize: 26, fontWeight: 900, textShadow: "0 0 18px rgba(255,184,0,.6)" }}>LEVEL UP!</div>
         <div style={{ width: 210, height: 13, background: "#1a1230", borderRadius: 7, margin: "14px 0", overflow: "hidden" }}>
           <div style={{ height: "100%", background: "linear-gradient(90deg,#7c9cf5,#5ec9a3)", animation: "cs-xp 1.6s ease-out forwards" }} />
@@ -581,9 +595,10 @@ export default function CelebrationScreen({
         </div>
       </div>
     );
-  } else if (variant === 13) {
+  } else if (variant === 13) {13
     content = (
       <div style={{ ...bigCard, background: "#4a3626" }}>
+        <CardFace />
         <div style={{ fontSize: 44 }}>🔨</div>
         <div style={{ color: "#f5e6c8", fontSize: 22, fontWeight: 900, margin: "10px 0" }}>VERDICT: GUILTY</div>
         <div style={{ color: "#e0cfa8", fontSize: 13, lineHeight: 1.6 }}>
@@ -592,9 +607,10 @@ export default function CelebrationScreen({
         <div style={{ color: "#c9b485", fontSize: 11, marginTop: 8 }}>{"Court adjourned. Gravity\u2019s lawyer stormed out."}</div>
       </div>
     );
-  } else if (variant === 14) {
+  } else if (variant === 14) {14
     content = (
       <div style={{ ...bigCard, background: "#060a14" }}>
+        <CardFace />
         <div style={{ fontSize: 36 }}>🚀</div>
         <div style={{ fontFamily: "'Courier New', monospace", color: "#5ef2c5", fontSize: 12, textAlign: "left", background: "#0b1322", border: "1px solid #1d3050", borderRadius: 10, padding: 12, marginTop: 10, width: 240, lineHeight: 1.7 }}>
           {"> MISSION: " + (dayLabel || "TODAY").toUpperCase()}<br />
@@ -606,9 +622,10 @@ export default function CelebrationScreen({
         <div style={{ color: "#7d93c4", fontSize: 11, marginTop: 10 }}>{"\"Houston, we have no problem whatsoever.\""}</div>
       </div>
     );
-  } else if (variant === 15) {
+  } else if (variant === 15) {15
     content = (
       <div style={{ ...bigCard, background: "#5c1238" }}>
+        <CardFace />
         <div style={{ color: "#ffe14d", fontSize: 22, fontWeight: 900, lineHeight: 1.2 }}>BUT WAIT —<br />THERE&rsquo;S MORE!</div>
         <div style={{ color: "#ffd9ec", fontSize: 13.5, lineHeight: 1.6, marginTop: 12 }}>
           {"You did not just finish a workout — you got " + vStr + " lbs of value ABSOLUTELY FREE! Act in the next 24 hours and we will throw in complimentary DOMS* at no extra charge!"}
@@ -616,9 +633,10 @@ export default function CelebrationScreen({
         <div style={{ color: "#ff9ecb", fontSize: 10, marginTop: 10 }}>*Delayed Onset Muscle Soreness. Cannot be returned. Operators are standing by (you cannot).</div>
       </div>
     );
-  } else if (variant === 16) {
+  } else if (variant === 16) {16
     content = (
       <div style={{ ...bigCard, background: "#000", overflow: "hidden" }}>
+        <CardFace />
         <div style={{ animation: "cs-credits 11s linear infinite", color: "#fff", fontSize: 13, lineHeight: 2, textAlign: "center" }}>
           <b style={{ fontSize: 18 }}>&ldquo;THE SESSION&rdquo;</b><br /><br />
           STARRING<br /><b>{firstName}</b><br /><br />
@@ -629,9 +647,10 @@ export default function CelebrationScreen({
         </div>
       </div>
     );
-  } else if (variant === 17) {
+  } else if (variant === 17) {17
     content = (
       <div style={{ ...bigCard, background: "#221a44" }}>
+        <CardFace />
         <div style={{ fontSize: 36 }}>🔮</div>
         <div style={{ color: "#d9c9ff", fontSize: 17, fontWeight: 800, margin: "10px 0" }}>TODAY&rsquo;S GYM HOROSCOPE</div>
         <div style={{ color: "#cbb8f5", fontSize: 13.5, lineHeight: 1.65, fontStyle: "italic" }}>
@@ -640,9 +659,10 @@ export default function CelebrationScreen({
         <div style={{ color: "#8f7cc9", fontSize: 11, marginTop: 8 }}>{"Lucky number: " + setCount + ". Lucky element: Iron."}</div>
       </div>
     );
-  } else if (variant === 18) {
+  } else if (variant === 18) {18
     content = (
       <div style={{ ...bigCard, background: "#5c3a20" }}>
+        <CardFace />
         <div style={{ fontSize: 40 }}>🍳</div>
         <div style={{ color: "#ffe9cf", fontSize: 19, fontWeight: 900, margin: "10px 0" }}>*chef&rsquo;s kiss* MAGNIFIQUE!</div>
         <div style={{ color: "#f5d9b8", fontSize: 13.5, lineHeight: 1.6 }}>
@@ -651,9 +671,10 @@ export default function CelebrationScreen({
         <div style={{ color: "#d9b183", fontSize: 11, marginTop: 8 }}>Pairs beautifully with an enormous dinner.</div>
       </div>
     );
-  } else if (variant === 19) {
+  } else if (variant === 19) {19
     content = (
       <div style={{ ...bigCard, background: "#4d1233" }}>
+        <CardFace />
         <div style={{ color: "#ff8fc0", fontSize: 24, fontWeight: 900 }}>IT&rsquo;S A MATCH! 💘</div>
         <div style={{ display: "flex", gap: 14, margin: "16px 0", justifyContent: "center" }}>
           <div style={{ width: 80, height: 80, borderRadius: "50%", background: "var(--brand-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36, border: "3px solid #fff" }}>💪</div>
@@ -664,9 +685,10 @@ export default function CelebrationScreen({
         </div>
       </div>
     );
-  } else if (variant === 20) {
+  } else if (variant === 20) {20
     content = (
       <div style={{ ...bigCard, background: "#141024" }}>
+        <CardFace />
         <div style={{ width: 240, borderRadius: 16, padding: 4, background: "linear-gradient(120deg,#ffe14d,#ff7ae0,#5ef2c5,#7c9cf5,#ffe14d)", backgroundSize: "300% 300%", animation: "cs-shimmer 3s linear infinite", boxShadow: "0 12px 30px rgba(0,0,0,.5)" }}>
           <div style={{ background: "#1a1330", borderRadius: 13, padding: 14, color: "#fff" }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, fontWeight: 800, letterSpacing: 1, color: "#ffe14d" }}>
@@ -691,9 +713,10 @@ export default function CelebrationScreen({
         <div style={{ fontSize: 11, color: "var(--brand-text-secondary)", marginTop: 12 }}>Add it to the collection. Gotta lift &rsquo;em all.</div>
       </div>
     );
-  } else if (variant === 21) {
+  } else if (variant === 21) {21
     content = (
       <div style={{ ...bigCard, background: "#08130d", color: "#fff", padding: 0 }}>
+        <CardFace />
         <div style={{ width: "100%", background: "#0a1f16", color: "#5ec9a3", fontSize: 11, fontWeight: 800, padding: "7px 0", whiteSpace: "nowrap", overflow: "hidden", borderBottom: "1px solid #16412f" }}>
           <div style={{ display: "inline-block", animation: "cs-ticker 10s linear infinite" }}>
             {"$GAINS ▲ +420%   ·   $EXCUSES ▼ -100%   ·   $COUCH ▼ -88%   ·   $GRAVITY ▼ HALTED   ·   $GAINS ▲ +420%   ·   $EXCUSES ▼ -100%   ·   $COUCH ▼ -88%   ·   $GRAVITY ▼ HALTED   ·   "}
@@ -715,9 +738,10 @@ export default function CelebrationScreen({
         </div>
       </div>
     );
-  } else if (variant === 22) {
+  } else if (variant === 22) {22
     content = (
       <div style={{ ...bigCard, background: "var(--brand-surface)", color: "var(--brand-text)", justifyContent: "flex-start", padding: 16 }}>
+        <CardFace />
         <div style={{ fontSize: 15, fontWeight: 900, marginBottom: 2 }}>Today&rsquo;s Session</div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
           <div style={{ fontSize: 30, fontWeight: 900, color: "var(--brand-primary)" }}>4.9</div>
@@ -738,9 +762,10 @@ export default function CelebrationScreen({
         </div>
       </div>
     );
-  } else if (variant === 23) {
+  } else if (variant === 23) {23
     content = (
       <div style={{ ...bigCard, background: "#0b0f17", color: "#fff", justifyContent: "flex-start", padding: 14 }}>
+        <CardFace />
         <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 2 }}>💪 The Muscle Group</div>
         <div style={{ fontSize: 10, color: "#8ea0be", marginBottom: 12 }}>Chest, Delts, Triceps, Core +3</div>
         <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 8, fontSize: 12 }}>
@@ -764,7 +789,7 @@ export default function CelebrationScreen({
         </div>
       </div>
     );
-  } else if (variant === 24) {
+  } else if (variant === 24) {24
     // ── The Ledger — stats type out like a receipt, then stamp PAID IN FULL.
     // The calm, premium alternative to confetti. Pure CSS animation.
     const rows: [string, string][] = [
@@ -776,6 +801,7 @@ export default function CelebrationScreen({
     ];
     content = (
       <div style={{ ...bigCard, background: "#0b1220", justifyContent: "flex-start", padding: 20 }}>
+        <CardFace />
         <div style={{ width: "100%", maxWidth: 300, fontFamily: "ui-monospace, Menlo, monospace" }}>
           <div style={{ textAlign: "center", letterSpacing: 4, fontSize: 10, color: "#7f8ea3", marginBottom: 16 }}>
             SYMMETRY · RECEIPT
@@ -817,7 +843,7 @@ export default function CelebrationScreen({
         </div>
       </div>
     );
-  } else if (variant === 25) {
+  } else if (variant === 25) {25
     // ── Full Send — three rings close one after another.
     const rings: [string, string, number][] = [
       ["Sets", "#3fb950", totalSetsForRings > 0 ? Math.min(1, setCount / totalSetsForRings) : 1],
@@ -826,6 +852,7 @@ export default function CelebrationScreen({
     ];
     content = (
       <div style={{ ...bigCard, background: "#04121a" }}>
+        <CardFace />
         <div style={{ display: "flex", gap: 16, justifyContent: "center" }}>
           {rings.map(([label, col, pct], i) => (
             <div key={label} style={{ textAlign: "center" }}>
@@ -855,7 +882,7 @@ export default function CelebrationScreen({
         </div>
       </div>
     );
-  } else if (variant === 26) {
+  } else if (variant === 26) {26
     // ── Coach Mode — the man himself, flexing, with something to say about the
     // session. Tap him to hear a different opinion. The card is hardcoded dark
     // because the artwork is a cutout on a gym-wall backdrop, so every colour
@@ -902,7 +929,7 @@ export default function CelebrationScreen({
         </div>
       </div>
     );
-  } else if (variant === 27) {
+  } else if (variant === 27) {27
     // ── The Receipt Total — one number, made enormous. The whole concept is
     // that volume is a big number and nobody ever sees it written large.
     content = (
@@ -916,7 +943,7 @@ export default function CelebrationScreen({
         </div>
       </div>
     );
-  } else if (variant === 28) {
+  } else if (variant === 28) {28
     // ── The Quiet One. No confetti, no joke. Some sessions do not want a party
     // and the rotation should be able to just nod at you.
     content = (
@@ -930,7 +957,7 @@ export default function CelebrationScreen({
         </div>
       </div>
     );
-  } else if (variant === 29) {
+  } else if (variant === 29) {29
     // ── The Streak Ladder — only interesting if the streak is real, so it says
     // so plainly when it is not rather than inflating a 1 into a milestone.
     const rungs = [3, 7, 14, 30, 60];
@@ -954,7 +981,7 @@ export default function CelebrationScreen({
         </div>
       </div>
     );
-  } else if (variant === 30) {
+  } else if (variant === 30) {30
     // ── Certificate of Showing Up. Deadpan formality about something small.
     content = (
       <div style={{ ...bigCard, background: "#fdfaf3", color: "#3b3629", border: "6px double #a4443c", padding: 22 }}>
@@ -969,7 +996,7 @@ export default function CelebrationScreen({
         <div style={{ fontSize: 10, color: "#8a7f6b", marginTop: 14, fontStyle: "italic" }}>Signed, {coachName}. Unframed, as is tradition.</div>
       </div>
     );
-  } else if (variant === 31) {
+  } else if (variant === 31) {31
     // ── The Weather Report. Session conditions, forecast tomorrow.
     content = (
       <div style={{ ...bigCard, background: "linear-gradient(160deg,#1e3a5f,#0b1220)", color: "#fff", justifyContent: "flex-start", paddingTop: 22 }}>
@@ -992,7 +1019,7 @@ export default function CelebrationScreen({
         </div>
       </div>
     );
-  } else if (variant === 32) {
+  } else if (variant === 32) {32
     // ── Two Versions Of You. The comparison people actually respond to is not
     // against anybody else.
     content = (
@@ -1015,7 +1042,7 @@ export default function CelebrationScreen({
         </div>
       </div>
     );
-  } else if (variant === 33) {
+  } else if (variant === 33) {33
     // ── The Group Chat Leak — the muscles again, but on a rest-day argument.
     // Kept short; the joke does not improve with length.
     content = (
@@ -1035,10 +1062,11 @@ export default function CelebrationScreen({
         <div style={{ marginTop: 14 }}><Face mood="happy" size={52} /></div>
       </div>
     );
-  } else if (variant === 34) {
+  } else if (variant === 34) {34
     // ── The Invoice. Billed to yourself, paid in effort.
     content = (
       <div style={{ ...bigCard, background: "#fff", color: "#111", padding: 20, fontFamily: "ui-monospace, Menlo, monospace" }}>
+        <CardFace />
         <div style={{ width: "100%", maxWidth: 290, textAlign: "left" }}>
           <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "2px solid #111", paddingBottom: 6 }}>
             <b style={{ fontSize: 15 }}>INVOICE</b><span style={{ fontSize: 11 }}>#{String(setCount).padStart(3, "0")}</span>
@@ -1063,7 +1091,7 @@ export default function CelebrationScreen({
         </div>
       </div>
     );
-  } else if (variant === 35) {
+  } else if (variant === 35) {35
     // ── The Long Game. Deliberately the least jokey in the set — the one that
     // lands on a day somebody needed a reason rather than a laugh.
     content = (
@@ -1079,7 +1107,7 @@ export default function CelebrationScreen({
         <div style={{ fontSize: 11.5, color: "#6f83a0", marginTop: 14, fontStyle: "italic" }}>Come back and do it again.</div>
       </div>
     );
-  } else if (variant === 36) {
+  } else if (variant === 36) {36
     // ── The Scoreboard. Big, loud, and the only one in the ten that shouts.
     content = (
       <div style={{ ...bigCard, background: "#08111e", color: "#fff", padding: 18 }}>
@@ -1159,10 +1187,27 @@ export default function CelebrationScreen({
   // so it stays a thing that happens to you a few times a year rather than a
   // card you get bored of. The PR plate above already carries the numbers, so
   // this card is the reaction, not a second scoreboard.
-  // hasCoachFace: the apparition IS the coach's face. Without one there is
-  // nothing to materialise, so the ordinary variant stands rather than a
-  // stranger's photograph appearing in a golden halo.
-  if (bigPr && topPr && hasCoachFace) {
+  // ── "A DISTURBANCE IN THE GYM" — SAME CARD, DIFFERENT FACE ──────────────
+  //
+  // Dustin, 14 Sep: *"get rid of the one w my actual face/head only its too
+  // goofy"* — then, on what to do instead: *"swap it w another avatar."*
+  //
+  // So the card stays. It was never the card that was wrong: the golden halo
+  // on a big PR is the best moment in the rotation. What was wrong was
+  // /coach-head.webp in the middle of it — a cutout of his head, nothing else,
+  // bobbing.
+  //
+  // The avatar takes that slot, at the `pr` mood specifically rather than the
+  // screen's cardMood, because this card only ever fires ON a PR and the face
+  // should be the one that means exactly that. The copy moves with it: a
+  // sticker cannot "materialise" and "will not be answering questions", which
+  // was written for a photograph of a real person.
+  //
+  // It still only fires when the PR is genuinely big — see `bigPr` above — and
+  // it no longer needs `hasCoachFace`, because the avatar is always there. A
+  // client of another trainer gets this card now too, which they never could
+  // before: there was nothing to put in the halo that was not a stranger.
+  if (bigPr && topPr) {
     const jump = Math.round(Math.abs(prGain));
     content = (
       <div style={{ ...bigCard, background: "radial-gradient(100% 80% at 50% 34%, #3a2c10 0%, #150f04 62%, #080602 100%)", padding: "22px 16px" }}>
@@ -1170,22 +1215,17 @@ export default function CelebrationScreen({
         <div style={{ position: "relative", zIndex: 1, fontSize: 9.5, letterSpacing: 3.5, fontWeight: 900, color: "#e0a83e" }}>
           A DISTURBANCE IN THE GYM
         </div>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={coachIsOwnerWithCutout ? "/coach-head.webp" : (coachFaceUrl as string)}
-          alt={`Coach ${coachName} has appeared`}
-          style={coachIsOwnerWithCutout
-            ? { width: 132, height: "auto", display: "block", margin: "14px 0 4px", position: "relative", zIndex: 1, filter: "drop-shadow(0 0 26px rgba(224,168,62,.55))", animation: "cs-bob 3.4s ease-in-out .3s infinite" }
-            : { width: 120, height: 120, borderRadius: "50%", objectFit: "cover", display: "block", margin: "14px auto 4px", position: "relative", zIndex: 1, border: "3px solid rgba(224,168,62,.8)", filter: "drop-shadow(0 0 26px rgba(224,168,62,.55))", animation: "cs-bob 3.4s ease-in-out .3s infinite" }}
-        />
+        <div style={{ position: "relative", zIndex: 1, margin: "14px 0 4px", filter: "drop-shadow(0 0 26px rgba(224,168,62,.55))", animation: "cs-bob 3.4s ease-in-out .3s infinite" }}>
+          <Face mood="pr" size={124} />
+        </div>
         <div style={{ position: "relative", zIndex: 1, fontSize: 18.5, fontWeight: 900, color: "#ffe9b0", lineHeight: 1.25, marginTop: 8 }}>
           {topPr.assistance
             ? `${firstName} took ${jump} pound${jump === 1 ? "" : "s"} off the ${topPr.movement}.`
             : `${firstName} put ${jump} more pound${jump === 1 ? "" : "s"} on ${topPr.movement}.`}
         </div>
         <div style={{ position: "relative", zIndex: 1, fontSize: 12.5, color: "#d9c18a", marginTop: 8, maxWidth: 270, lineHeight: 1.55 }}>
-          Coach {coachName} has materialised. {coachName} only does this for the big
-          ones, and will not be answering questions.
+          That is a big one. Coach {coachName} will hear about it — the rest of
+          us are just going to stand here for a moment.
         </div>
       </div>
     );
@@ -1271,15 +1311,9 @@ export default function CelebrationScreen({
 
       {content}
 
-      {/* Community: push the win into the group chat. */}
-      {/* A PR has already posted itself (silently) — see the auto-share effect.
-          Offering "Share this PR" again would double-post it. */}
-      {!topPr && <ShareToGroup text={shareText} label="Share to group" />}
-      {topPr && (
-        <p style={{ fontSize: 12, fontWeight: 700, textAlign: "center", color: "rgba(255,255,255,0.6)", margin: "4px 0 8px" }}>
-          👊 Posted to the group
-        </p>
-      )}
+      {/* The "Share to group" button and the "Posted to the group" line both
+          went on 14 Sep with the auto-share above. A finished workout does not
+          announce itself any more, by hand or otherwise. */}
 
       </div>
       {/* Pinned, so a card tall enough to scroll can never put the only way out

@@ -136,13 +136,22 @@ test("the running best is seeded from the first session, not from zero", () => {
 test("both screens say 'assist' rather than showing a bare number", () => {
   assert.match(SPOTTER, /r\.assistance \? " assist" : ""/);
   assert.match(CELEB_UI, /less help/, "'previous best 140 lb' next to '120 lb' reads as a step backwards");
-  assert.match(CELEB_UI, /loadLabel\(topPr\.weight/);
+  // The celebration's own PR plate labels it inline rather than through
+  // loadLabel: the share text that used the helper was removed with the group
+  // posting on 14 Sep, and the plate is now the only place it is said.
+  assert.match(CELEB_UI, /topPr\.assistance \? <span[^>]*> assist<\/span> : null/,
+    "the bare number is back on the PR plate");
 });
 
 test("a big PR is measured by the gain, whichever way the gain runs", () => {
-  // The floating-head takeover fires on +10 lb or +5%. On an assisted movement
-  // that has to be MINUS 10 lb, or the rarest celebration in the app can never
-  // fire for these lifts at all.
+  // `bigPr` fires on +10 lb or +5%. On an assisted movement that has to be
+  // MINUS 10 lb, or these lifts can never reach it at all.
+  //
+  // It used to gate the floating-head takeover, which was removed on 14 Sep
+  // ("get rid of the one w my actual face/head only"). `bigPr` outlived it —
+  // it still drives the AI badge's mood — so the direction rule still matters
+  // and is still checked; the assertion about that card's headline is the only
+  // part that went.
   const c = code(CELEB_UI);
   assert.match(c, /topPr\.assistance \? topPr\.previous - topPr\.weight : topPr\.weight - topPr\.previous/);
   assert.match(c, /prGain >= 10 \|\| prGain >= topPr\.previous \* 0\.05/);
@@ -150,5 +159,6 @@ test("a big PR is measured by the gain, whichever way the gain runs", () => {
     !/topPr\.weight - topPr\.previous >= 10/.test(c),
     "the one-directional threshold is back",
   );
-  assert.match(c, /took \$\{jump\} pound/, "the headline has to describe what actually happened");
+  assert.match(c, /\$\{Math\.round\(prGain\)\} lb less help/,
+    "the PR plate has to describe what actually happened on an assisted lift");
 });

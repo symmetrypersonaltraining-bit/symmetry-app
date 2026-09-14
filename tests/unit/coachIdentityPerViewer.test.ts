@@ -123,20 +123,25 @@ test("the privacy policy describes a studio with more than one trainer", () => {
 
 // ─── the two photographs of the owner ───────────────────────────────────────
 
-test("the celebration photos of the owner are shown only to the owner's clients", () => {
+test("the celebration photo of the owner is shown only to the owner's clients", () => {
   const c = code(read("src/components/CelebrationScreen.tsx"));
-  for (const f of ["/coach-flex.webp", "/coach-head.webp"]) {
-    assert.ok(c.includes(f), f + " is gone — if it was removed on purpose, remove this assertion too");
-  }
-  // Both are cutouts of one specific man. Guarded, they are a nice card; not
-  // guarded, they are a stranger's photograph captioned COACH APPROVED.
+
+  // THERE WAS A SECOND ONE. /coach-head.webp — the halo apparition on any big
+  // PR — was removed on 14 Sep at Dustin's word: "get rid of the one w my
+  // actual face/head only its too goofy." The old version of this test asserted
+  // both files were present and said in its own failure message that the
+  // assertion should go if the card ever did. It has.
+  assert.ok(!c.includes("/coach-head.webp"), "the head cutout is back — see AI-WALK-NOTES.md");
+
+  assert.ok(c.includes("/coach-flex.webp"),
+    "/coach-flex.webp is gone — if it was removed on purpose, remove this assertion too");
+  // It is a cutout of one specific man. Guarded, it is a nice card; not
+  // guarded, it is a stranger's photograph captioned COACH APPROVED.
   assert.match(c, /coachIsOwnerWithCutout \? \(\s*<img\s*src="\/coach-flex\.webp"/,
     "the flex cutout is not gated on the viewer's coach being the owner");
-  assert.match(c, /src=\{coachIsOwnerWithCutout \? "\/coach-head\.webp" : \(coachFaceUrl as string\)\}/,
-    "the apparition is not gated on the viewer's coach being the owner");
   // And no face at all means no card, rather than an empty frame.
-  assert.match(c, /if \(bigPr && topPr && hasCoachFace\)/,
-    "the apparition still fires for a coach with no photograph on file");
+  assert.match(c, /if \(variant === COACH_MODE && !hasCoachFace\)/,
+    "a coach with no photograph on file still lands on the photo variant");
 });
 
 test("the celebration bodyweight unit is the client's own coach", () => {

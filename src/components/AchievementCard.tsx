@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { drawShareCard, canvasToBlob, ShareCardData } from "@/lib/shareCard";
-import ShareToGroup from "@/components/ShareToGroup";
 import { fx } from "@/lib/fx";
 
 /**
@@ -14,8 +13,11 @@ import { fx } from "@/lib/fx";
  *   1. Share — the native sheet, with the PNG attached, when the device
  *      supports sharing files (Android WebView + iOS both do).
  *   2. Save image — a plain download, always available as the fallback.
- *   3. Share to group — posts the text version into the group chat via the
- *      existing ShareToGroup button, so wins land where the community is.
+ *
+ * A third way out — "Share to group", which posted the text version into the
+ * group chat — was removed on 14 Sep 2026 with the rest of the automatic
+ * group posting. See docs/audit/AI-WALK-NOTES.md: the group chat is becoming a
+ * Community, and what goes into it will be a decision, not a by-product.
  *
  * SAFETY: read-only, client-side, under the caller's own RLS. If anything
  * fails — no canvas, no data, no share API — the button either never renders
@@ -324,11 +326,12 @@ export default function AchievementCard({ clientId, name }: { clientId: string; 
               </button>
             </div>
 
-            <ShareToGroup
-              text={shareText}
-              label="Post it in the group"
-              style={{ width: "100%" }}
-            />
+            {/* "Post it in the group" went on 14 Sep. Dustin: *"get rid of
+                sharing the prs n completed workout options for group chat."*
+                The image itself is untouched — Share and Save image both stay,
+                so the week still leaves the app by whatever route the person
+                chooses. What is gone is the one that posted it into a thread
+                thirty-five people read. */}
           </div>
         </div>
       )}
