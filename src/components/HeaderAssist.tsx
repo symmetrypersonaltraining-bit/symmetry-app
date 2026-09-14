@@ -7,6 +7,7 @@ import NotificationCenter from "@/components/NotificationCenter";
 import { watchTrainerMode } from "@/lib/auth/trainerMode";
 import { browserTrainerModeDeps } from "@/lib/auth/trainerModeBrowser";
 import { useCoach } from "@/lib/useCoach";
+import { useBackClosesOverlay } from "@/lib/nav/useBackClosesOverlay";
 /**
  * HeaderAssist — feedback (all users) + AI assistant (trainer only) buttons
  * living in the AppHeader top-right corner. Replaces the floating dock.
@@ -48,6 +49,9 @@ export default function HeaderAssist({ solid = false }: { solid?: boolean }) {
   const [available, setAvailable] = useState(false);
   const [open, setOpen] = useState(false);
   const [sentiment, setSentiment] = useState<"like" | "change" | null>(null);
+
+  // Back closes the drawer rather than leaving the page.
+  useBackClosesOverlay(open ? 1 : 0, () => setOpen(false));
   const [msg, setMsg] = useState("");
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);

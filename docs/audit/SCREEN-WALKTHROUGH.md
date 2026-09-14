@@ -4578,6 +4578,44 @@ shut.
 `WorkoutDaySheet`, `AIAssistant`, the zoom overlays). This fixes the screen he
 reported it on; the rule is app-wide.
 
+
+### Back closes what is on top — app-wide  ·  13 Sep 2026
+
+Dustin: *"Yes fix them all crash safe on logger."*
+
+One rule, one implementation: `src/lib/nav/useBackClosesOverlay.ts`. A component
+hands it how many overlay levels are open and a function that closes ONE. Back
+pops one level, so two deep it lands on the one underneath — the previous screen
+you were looking at, which is the rule.
+
+**Now answering Back:** Nutrition v3 sheets, Grocery list, Barcode scanner,
+Workout logger (session mode + video, swap, coach, AI note, note sheet), Workout
+day sheet, Add workout (and its Build / Custom views), Notifications, Feedback,
+Header assist, Goal sheet, Progress photos (lightbox, then guide).
+
+**Already correct, left alone:** `VideoZoom` and `ChartZoom` had this pattern
+from the start — push on open, pop closes, hand the entry back on cleanup if it
+is still on top. That is where the guard used in the hook comes from.
+
+> ⚠️ **The logger had its own popstate listener** for session mode, and a second
+> one would have been the bug rather than the fix: every listener on the window
+> fires, so closing the swap modal would have dropped out of session mode
+> underneath it at the same time. It is on the shared hook now with one combined
+> depth — overlays close first, then session mode. A test asserts the logger
+> registers no listener of its own.
+
+**Crash safe, as required to touch the logger:** SSR-guarded, every history call
+wrapped, and a browser that refuses `pushState` degrades to the old behaviour
+(Back leaves the page) rather than throwing. Nothing touches sets, reps or
+weights.
+
+**Still to do — trainer-side modals:** New client, Assign program, Invite
+client, Workout day editor, Schedule board, Recipes, Exercise library, Messages,
+Payments, Trainer calendar, Saturday review, Trainer week digest. Same hook,
+same one-line change; they are desktop-first, which is why they are second.
+Takeovers (`ClientTakeovers`, `AssessmentGate`, `AiLimitTakeover`) are
+deliberately excluded — a gate that Back dismisses is not a gate.
+
 ---
 
 ## Interlude — the barcode scanner had never worked on his phone (14 Sep 2026)
