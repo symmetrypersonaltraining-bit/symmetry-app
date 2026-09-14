@@ -15,6 +15,7 @@
 
 import { useMemo, useState } from "react";
 import { UNITS, METRIC_LABEL, kcalPerDayFor, recentRate, type GoalMetric, type Reading } from "@/lib/goals";
+import { useBackClosesOverlay } from "@/lib/nav/useBackClosesOverlay";
 
 const DAY = 86_400_000;
 const ms = (iso: string) => new Date(`${iso}T12:00:00`).getTime();
@@ -40,6 +41,9 @@ export default function GoalSetSheet({
   );
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  // Mounted only while open: constant depth 1, entry handed back on unmount.
+  useBackClosesOverlay(1, onClose);
 
   // What this asks of them, said before they commit rather than after.
   const reality = useMemo(() => {

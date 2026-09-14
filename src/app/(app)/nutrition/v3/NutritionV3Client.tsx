@@ -13,6 +13,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { centralToday } from "@/lib/central-time";
+import { useBackClosesOverlay } from "@/lib/nav/useBackClosesOverlay";
 import Confetti from "@/components/Confetti";
 import MicButton from "@/components/MicButton";
 import { startDictation } from "@/lib/dictation";
@@ -1146,67 +1147,11 @@ export default function NutritionV3Client(props: Props) {
   // Dustin, 13 Sep: *"the back button on mobile goes back to home. That's not
   // the previous screen so that breaks my rule about back button on mobile."*
   //
-  // His rule, set on 11 Sep and written into lib/nav/backFromHere.ts: *"When you
-  // hit either button, it needs to go back one page — the previous screen you
-  // were looking at."*
-  //
-  // A sheet was not a history entry, so with one open, Back popped the whole
-  // NUTRITION page and landed on whatever came before it — Home, usually. The
-  // previous screen he was looking at was this page with the sheet shut, and
-  // there was no way to get there with the control people actually use.
-  //
-  // BackButtonGuard does not cover this: it only binds inside a Capacitor
-  // shell, and Capacitor is deliberately out of package.json, so on his phone
-  // this is Chrome's own Back and nothing was listening.
-  //
-  // ── WHY THIS IS NOT THE SENTINEL THAT WAS RIPPED OUT ─────────────────────
-  //
-  // backFromHere.ts warns, in capitals, never to push an invented history entry
-  // so Back "has somewhere to go" — the BackButtonGuard v2/v3 bug. That entry
-  // had the SAME URL as the page under it, so popping onto it re-rendered the
-  // identical screen and read as a dead press.
-  //
-  // The difference is what the entry MEANS. One per open sheet, pushed only
-  // when a sheet actually opens, and popping it visibly closes that sheet. No
-  // press is ever dead, and nothing is pushed on a page with no sheet open.
-  const sheetDepth = sheetStack.length;
-  const historyDepth = useRef(0);
-  const selfPop = useRef(false);
-
-  useEffect(() => {
-    function onPop() {
-      // Our own history.go() below fires this too; that one is bookkeeping,
-      // not the person pressing Back.
-      if (selfPop.current) { selfPop.current = false; return; }
-      if (historyDepth.current > 0) {
-        historyDepth.current -= 1;
-        setSheetStack((prev) => prev.slice(0, -1));
-      }
-    }
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, []);
-
-  useEffect(() => {
-    if (sheetDepth > historyDepth.current) {
-      for (let i = historyDepth.current; i < sheetDepth; i++) {
-        window.history.pushState({ symSheet: i + 1 }, "");
-      }
-      historyDepth.current = sheetDepth;
-    } else if (sheetDepth < historyDepth.current) {
-      // Closed from inside the app (✕, Save, Cancel). Give the entries back so
-      // the stack cannot grow every time a sheet is opened and shut.
-      const excess = historyDepth.current - sheetDepth;
-      historyDepth.current = sheetDepth;
-      selfPop.current = true;
-      window.history.go(-excess);
-      // If that go() produces no popstate — already at the bottom of the stack,
-      // say — the flag would stay armed and swallow the NEXT real Back. That is
-      // the dead-press failure this app has had twice. It cannot happen twice
-      // more for the sake of an unset boolean.
-      window.setTimeout(() => { selfPop.current = false; }, 300);
-    }
-  }, [sheetDepth]);
+  // Shipped inline here first, then lifted to lib/nav/useBackClosesOverlay.ts
+  // the same evening when he asked for every other sheet in the app to behave
+  // the same way — *"Yes fix them all"*. One rule, one implementation; a second
+  // copy is how two sheets end up disagreeing about what Back means.
+  useBackClosesOverlay(sheetStack.length, backSheet);
 
   // ---- inserted meals -----------------------------------------------------
   function freeInsertPosition(): number | null {

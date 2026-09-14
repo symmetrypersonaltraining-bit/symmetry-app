@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { centralFormatDate } from "@/lib/central-time";
+import { useBackClosesOverlay } from "@/lib/nav/useBackClosesOverlay";
 
 interface GItem { id: string; food: string; amount: number | null; unit: string | null; is_unlimited: boolean; position: number; basis?: string | null; }
 interface GMeal { id: string; name: string; timing: string | null; position: number; meal_items: GItem[]; }
@@ -58,6 +59,10 @@ export default function GroceryListSheet({ plan, onClose }: { plan: GPlan; onClo
   // fresh[mealId] = true → made fresh daily (no containers on the prep card).
   const [fresh, setFresh] = useState<Record<string, boolean>>({});
   const [copied, setCopied] = useState(false);
+
+  // Mounted only while open, so the depth is a constant 1 and the hook hands
+  // the entry back on unmount. Back closes the sheet rather than leaving the page.
+  useBackClosesOverlay(1, onClose);
 
   const basisTag = (b?: string | null) => (b === "raw" ? " raw" : b === "cooked" ? " cooked" : "");
 

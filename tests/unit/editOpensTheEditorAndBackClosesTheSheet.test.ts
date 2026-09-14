@@ -34,6 +34,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const V3 = readFileSync(join(process.cwd(), "src/app/(app)/nutrition/v3/NutritionV3Client.tsx"), "utf8");
+// The mechanism moved to the shared hook when Dustin asked for every other
+// sheet in the app to behave the same way. The rule is asserted where it now
+// lives; this screen is asserted to USE it.
+const HOOK = readFileSync(join(process.cwd(), "src/lib/nav/useBackClosesOverlay.ts"), "utf8");
 
 describe("edit opens the editor and back closes the sheet", () => {
   it("Edit and ⋯ are no longer the same call", () => {
@@ -78,29 +82,33 @@ describe("edit opens the editor and back closes the sheet", () => {
 
   // ── the back button ───────────────────────────────────────────────────────
   it("an open sheet is a history entry, so Back has it to pop", () => {
-    assert.match(V3, /window\.history\.pushState\(\{ symSheet/,
-      "without an entry per sheet, Back leaves the page entirely");
-    assert.match(V3, /window\.addEventListener\("popstate", onPop\)/,
+    assert.match(V3, /useBackClosesOverlay\(sheetStack\.length, backSheet\)/,
+      "the screen must hand its sheet depth to the shared hook");
+    assert.match(HOOK, /window\.history\.pushState\(\{ symOverlay/,
+      "without an entry per overlay, Back leaves the page entirely");
+    assert.match(HOOK, /window\.addEventListener\("popstate", onPop\)/,
       "and something has to listen for it");
   });
 
   it("Back closes ONE sheet, not the whole stack", () => {
     // Two deep (menu → editor) Back should land on the menu, which is the
     // previous screen he was looking at. That is the whole rule.
-    assert.match(V3, /setSheetStack\(\(prev\) => prev\.slice\(0, -1\)\)/,
-      "popstate must pop one level");
+    assert.match(V3, /useBackClosesOverlay\(sheetStack\.length, backSheet\)/,
+      "backSheet pops exactly one level — passing closeAllSheets would close the lot");
+    assert.match(HOOK, /pushed\.current -= 1;\s*\n\s*closeRef\.current\(\);/,
+      "one press, one level");
   });
 
   it("closing from inside the app gives the entry back", () => {
     // Otherwise every open-and-shut grows the history and Back needs as many
     // presses as sheets ever opened.
-    assert.match(V3, /window\.history\.go\(-excess\)/);
+    assert.match(HOOK, /window\.history\.go\(-excess\)/);
   });
 
   it("a swallowed popstate cannot arm a dead press", () => {
     // This app has shipped a dead Back button twice (BackButtonGuard v2 and
     // v3). If history.go() fires no popstate the flag must not stay set.
-    assert.match(V3, /setTimeout\(\(\) => \{ selfPop\.current = false; \}, 300\)/,
+    assert.match(HOOK, /setTimeout\(\(\) => \{ selfPop\.current = false; \}, 300\)/,
       "the self-pop flag must time out");
   });
 
@@ -108,7 +116,7 @@ describe("edit opens the editor and back closes the sheet", () => {
     // The sentinel that backFromHere.ts forbids in capitals was pushed on a
     // PAGE with the same URL, so popping it re-rendered the identical screen.
     // Every entry here corresponds to a sheet that is actually open.
-    assert.match(V3, /if \(sheetDepth > historyDepth\.current\)/,
-      "entries must be driven by the sheet depth, never pushed unconditionally");
+    assert.match(HOOK, /if \(depth > pushed\.current\)/,
+      "entries must be driven by the open depth, never pushed unconditionally");
   });
 });

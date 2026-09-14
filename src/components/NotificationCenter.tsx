@@ -13,6 +13,7 @@ import { useNotificationFeed } from "@/lib/useNotificationFeed";
 import { aggregateNotifications, totalUnread, NotifRow, RawUnread } from "@/lib/notifications";
 import { fetchGroupUnread, groupUnreadAsRows, markGroupRead } from "@/lib/groupUnread";
 import { centralFormat, centralDateOf, centralToday } from "@/lib/central-time";
+import { useBackClosesOverlay } from "@/lib/nav/useBackClosesOverlay";
 
 function fmtWhen(ts: string) {
   if (!ts) return "";
@@ -49,6 +50,9 @@ export default function NotificationCenter({ solid = false }: { solid?: boolean 
   // never touched, so nothing is lost and the count is right the moment it
   // comes back.
   const [quiet, setQuiet] = useState(false);
+
+  // Back closes the panel rather than leaving the page. See lib/nav/useBackClosesOverlay.ts.
+  useBackClosesOverlay(open ? 1 : 0, () => setOpen(false));
   useEffect(() => {
     try { setQuiet(sessionStorage.getItem("symmetry_notif_quiet") === "1"); } catch { /* private mode */ }
   }, []);
