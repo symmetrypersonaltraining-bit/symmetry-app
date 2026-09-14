@@ -10,6 +10,7 @@ import ManualWorkoutBuilder from "@/components/ManualWorkoutBuilder";
 
 import { useCoach } from "@/lib/useCoach";
 import { sessionsReplacedBy, slotForReplacement, skipVerdict, describeReplaced, type DateOccupant } from "@/lib/replaceOnDate";
+import { useBackClosesOverlay } from "@/lib/nav/useBackClosesOverlay";
 
 type LibDay = {
   id: string; label: string; description?: string | null; difficulty?: string | null;
@@ -63,6 +64,22 @@ export default function AddWorkoutButton({ dateStr, label = "+ Add workout", cli
   const [q, setQ] = useState("");
   const [custom, setCustom] = useState(false);
   const [build, setBuild] = useState(false);
+
+  // THE SHEET, AND THE SCREEN INSIDE IT.
+  //
+  // "Build" and "custom" are full views within the sheet, not decorations — the
+  // custom one even draws its own "Back to library". So they are a second
+  // level: Back from there returns to the library list, and only then does
+  // another Back close the sheet. That is the rule, "the previous screen you
+  // were looking at", applied inside an overlay as well as to it.
+  useBackClosesOverlay(
+    (open ? 1 : 0) + (open && (custom || build) ? 1 : 0),
+    () => {
+      if (build) setBuild(false);
+      else if (custom) setCustom(false);
+      else setOpen(false);
+    },
+  );
   const [text, setText] = useState("");
   // What was just logged, so the sheet can SAY it landed instead of
   // reloading into an identical-looking screen. See addCustom().

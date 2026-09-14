@@ -135,9 +135,33 @@ test("session mode does not leak its history entry", () => {
   // the page. Leaving by Cancel/Complete used to leave that entry as the
   // current one, so the next Back popped a dead entry with the same URL and
   // looked like it did nothing.
+  // The guard moved into lib/nav/useBackClosesOverlay.ts on 13 Sep, when every
+  // overlay in the app was put on one rule and the logger's standalone listener
+  // had to go — two listeners on one window means one Back press does two
+  // things, so closing the swap modal would have exited session mode under it.
+  //
+  // The REQUIREMENT is unchanged and is asserted at its new home: an entry that
+  // Back did not consume is handed back, or the next press on the overview pops
+  // a dead entry and reads as "Back did nothing".
   assert.ok(
-    SRC.includes("poppedByBack"),
-    "session-mode back handling must clean up its own history entry when it was not consumed by Back",
+    SRC.includes("useBackClosesOverlay("),
+    "the logger must use the shared overlay-back hook rather than its own listener",
+  );
+  assert.match(
+    SRC,
+    /sessionMode \? 1 : 0/,
+    "session mode must still be a level in that depth, or Back stops leaving the focused logger",
+  );
+  const HOOK_SRC = readFileSync(join(process.cwd(), "src/lib/nav/useBackClosesOverlay.ts"), "utf8");
+  assert.match(
+    HOOK_SRC,
+    /window\.history\.go\(-excess\)/,
+    "an entry left behind by Cancel/Complete must be handed back",
+  );
+  assert.match(
+    HOOK_SRC,
+    /catch \{/,
+    "crash safe on the logger was the condition of this change — history calls stay wrapped",
   );
 });
 

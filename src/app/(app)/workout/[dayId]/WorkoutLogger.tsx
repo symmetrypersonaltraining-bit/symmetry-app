@@ -33,6 +33,7 @@ import {
 } from "@/lib/setTimer";
 import { alarmPlan, armRestAlarm, type ArmedAlarm } from "@/lib/restAlarm";
 import { logClientError } from "@/lib/logClientError";
+import { useBackClosesOverlay } from "@/lib/nav/useBackClosesOverlay";
 
 /**
  * A number a client actually typed, or null when they typed nothing.
@@ -1117,34 +1118,44 @@ export default function WorkoutLogger({
   }, [sets, activeSectionIdx, activeExerciseIdx, sessionMode, sessionNote, workoutLogId, workoutComplete, sessionCancelled]);
   // --- end auto-save ---
 
-  // Hardware/browser BACK while in the focused logger: exit session mode back to
-  // the overview instead of leaving the page or the app.
+  // ── ONE BACK PRESS, ONE THING ─────────────────────────────────────────────
   //
-  // The cleanup matters as much as the setup, and it was missing. Entering
-  // session mode pushes a history entry; leaving by ANY route other than Back
-  // — Cancel, Complete, the swipe — left that entry sitting there as the
-  // current one. So back on the workout overview afterwards just popped our own
-  // dead entry: same URL, same render, nothing visibly happened. Press it twice
-  // and it worked. That is "the back button only works on some screens".
+  // This was a standalone popstate listener for session mode only. On 13 Sep
+  // Dustin asked for every overlay in the app to answer Back — *"Yes fix them
+  // all crash safe on logger"* — and a SECOND listener here would have been the
+  // bug, not the fix: one press fires every listener on the window, so closing
+  // the swap modal would have exited session mode underneath it at the same
+  // time.
   //
-  // Every entry into session mode leaked one, so the count grew with use.
-  useEffect(() => {
-    if (!sessionMode) return;
-    let poppedByBack = false;
-    try { window.history.pushState({ __wl: 1 }, ""); } catch { /* noop */ }
-    const onPop = () => { poppedByBack = true; setSessionMode(false); };
-    window.addEventListener("popstate", onPop);
-    return () => {
-      window.removeEventListener("popstate", onPop);
-      // Back already consumed the entry; calling back() again would eat a real
-      // one and skip the user past a page they never asked to leave.
-      if (poppedByBack) return;
-      try {
-        const st = window.history.state as { __wl?: number } | null;
-        if (st && st.__wl) window.history.back();
-      } catch { /* noop */ }
-    };
-  }, [sessionMode]);
+  // So it is one hook with one depth. The overlays sit on top of session mode
+  // and close first; only when none is open does Back leave the focused logger
+  // for the overview. Same behaviour as before for session mode itself.
+  //
+  // CRASH SAFE, as asked: every history call inside the hook is wrapped, it is
+  // SSR-guarded, and a browser that refuses pushState degrades to the old
+  // "Back leaves the page" rather than throwing. Nothing here touches sets,
+  // reps or weights.
+  //
+  // What the previous version got right and the hook keeps: the entry is handed
+  // back when session mode is left by any OTHER route — Cancel, Complete, the
+  // swipe — because leaving it behind is what made Back need two presses on the
+  // overview afterwards. ("The back button only works on some screens.")
+  useBackClosesOverlay(
+    (sessionMode ? 1 : 0) +
+      (videoUrl ? 1 : 0) +
+      (swapTargetPe ? 1 : 0) +
+      (coachOpen ? 1 : 0) +
+      (showAiNote ? 1 : 0) +
+      (noteSheetOpen ? 1 : 0),
+    () => {
+      if (videoUrl) { setVideoUrl(null); return; }
+      if (swapTargetPe) { setSwapTargetPe(null); return; }
+      if (noteSheetOpen) { setNoteSheetOpen(false); return; }
+      if (showAiNote) { setShowAiNote(false); return; }
+      if (coachOpen) { setCoachOpen(false); return; }
+      setSessionMode(false);
+    },
+  );
 
   const allFlat = localSections.flatMap(s => s.prescribed_exercises);
   const totalSets = Object.values(sets).reduce((a, arr) => a + arr.length, 0);

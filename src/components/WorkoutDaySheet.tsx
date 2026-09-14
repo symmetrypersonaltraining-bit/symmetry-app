@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { isPeakWeekLocked } from "@/lib/peak-week";
 import { moveScheduledWorkout, MOVE_BACK_DAYS } from "@/lib/moveWorkout";
+import { useBackClosesOverlay } from "@/lib/nav/useBackClosesOverlay";
 
 export type DaySheetWorkout = { id: string; dayId: string; date: string; label: string; status: string };
 
@@ -99,6 +100,11 @@ export default function WorkoutDaySheet({
   const [sel, setSel] = useState<string>(today);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+
+  // Mounted only while open, so the sheet itself is a constant 1 and the hook
+  // hands the entry back on unmount. "Moving" is a view inside it, so Back
+  // leaves that first and closes the sheet only on the next press.
+  useBackClosesOverlay(1 + (moving ? 1 : 0), () => { if (moving) setMoving(null); else onClose(); });
   const wheelRef = useRef<HTMLDivElement | null>(null);
 
   // Seven days back, same window the schedule board uses. A session logged on

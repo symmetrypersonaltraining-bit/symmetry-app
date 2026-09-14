@@ -5,6 +5,7 @@ import { submitFeedback } from "@/lib/feedback";
 import MicButton from "@/components/MicButton";
 
 import { useCoach } from "@/lib/useCoach";
+import { useBackClosesOverlay } from "@/lib/nav/useBackClosesOverlay";
 
 export default function FeedbackButton() {
   const { firstName: coachFirstName } = useCoach();
@@ -13,6 +14,9 @@ export default function FeedbackButton() {
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [listening, setListening] = useState(false);
+
+  // Back closes the sheet rather than leaving the page.
+  useBackClosesOverlay(open ? 1 : 0, () => setOpen(false));
   // The dictation handle and toggleMic that used to live here are MicButton's
   // job now. `listening` stays only to tint this button's own chrome. The
   // "which failure is it" wording this file pioneered was promoted INTO

@@ -8,6 +8,7 @@
 // close, or unmount — no leaked getUserMedia tracks.
 
 import { useEffect, useRef, useState } from "react";
+import { useBackClosesOverlay } from "@/lib/nav/useBackClosesOverlay";
 
 // BarcodeDetector isn't in the TS DOM lib yet — minimal shapes for what we use.
 type DetectedBarcode = { rawValue: string };
@@ -82,6 +83,11 @@ export default function BarcodeScanner({
   const rafRef = useRef<number | null>(null);
   const detectorRef = useRef<BarcodeDetectorLike | null>(null);
   const doneRef = useRef(false);
+
+  // Back closes the camera rather than leaving the Nutrition page — which on a
+  // phone is the single most likely moment to press it, because the viewfinder
+  // covers the screen and looks like somewhere you navigated to.
+  useBackClosesOverlay(1, onClose);
   // The code seen on the last frame, and how many frames in a row have agreed.
   const seenRef = useRef<{ code: string; n: number }>({ code: "", n: 0 });
 

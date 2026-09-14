@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { sendGroupMessage } from "@/app/(app)/home/messageActions";
+import { useBackClosesOverlay } from "@/lib/nav/useBackClosesOverlay";
 
 interface Photo {
   id: string;
@@ -116,6 +117,15 @@ export default function ProgressPhotos({ clientId, clientName }: { clientId: str
   const [aId, setAId] = useState<string>("");
   const [bId, setBId] = useState<string>("");
   const [sharing, setSharing] = useState(false);
+
+  // TWO OVERLAYS, AND THE LIGHTBOX IS THE ONE ON TOP.
+  //
+  // Back closes whichever is showing — the enlarged photo first, then the
+  // guide — rather than leaving the Progress page.
+  useBackClosesOverlay(
+    (lightbox ? 1 : 0) + (showGuide ? 1 : 0),
+    () => { if (lightbox) setLightbox(null); else setShowGuide(false); },
+  );
   const [shareMsg, setShareMsg] = useState<string | null>(null);
   // Two inputs, not one. `capture` is a REQUEST for the camera, and on most
   // Android builds it is honoured by removing the gallery from the picker
