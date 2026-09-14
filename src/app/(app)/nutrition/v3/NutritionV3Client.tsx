@@ -110,6 +110,18 @@ interface Row {
   defaultOrd: number;
 }
 
+/**
+ * Can this row's items actually be edited?
+ *
+ * AdjustSheetView renders null for anything else — an open slot, or a plan row
+ * whose option has not been chosen — so sending Edit there would open an empty
+ * sheet. Same two conditions AdjustSheetView itself tests, kept together on
+ * purpose: if one changes the other has to.
+ */
+function canEditItems(row: Row): boolean {
+  return (row.kind === "custom" && !!row.meta) || (row.kind === "plan" && !!row.chosen);
+}
+
 const OPEN_SLOTS = [
   { position: 1, name: "Breakfast", time: "8:00 AM" },
   { position: 2, name: "Snack 1", time: "10:30 AM" },
@@ -1128,6 +1140,73 @@ export default function NutritionV3Client(props: Props) {
   function replaceSheet(s: NonNullable<SheetState>) { setSheetStack((prev) => [...prev.slice(0, -1), s]); }
   function backSheet() { setSheetStack((prev) => prev.slice(0, -1)); }
   function closeAllSheets() { adjustDrafts.current = {}; setSheetStack([]); }
+
+  // ── THE PHONE'S BACK BUTTON CLOSES A SHEET, NOT THE PAGE ──────────────────
+  //
+  // Dustin, 13 Sep: *"the back button on mobile goes back to home. That's not
+  // the previous screen so that breaks my rule about back button on mobile."*
+  //
+  // His rule, set on 11 Sep and written into lib/nav/backFromHere.ts: *"When you
+  // hit either button, it needs to go back one page — the previous screen you
+  // were looking at."*
+  //
+  // A sheet was not a history entry, so with one open, Back popped the whole
+  // NUTRITION page and landed on whatever came before it — Home, usually. The
+  // previous screen he was looking at was this page with the sheet shut, and
+  // there was no way to get there with the control people actually use.
+  //
+  // BackButtonGuard does not cover this: it only binds inside a Capacitor
+  // shell, and Capacitor is deliberately out of package.json, so on his phone
+  // this is Chrome's own Back and nothing was listening.
+  //
+  // ── WHY THIS IS NOT THE SENTINEL THAT WAS RIPPED OUT ─────────────────────
+  //
+  // backFromHere.ts warns, in capitals, never to push an invented history entry
+  // so Back "has somewhere to go" — the BackButtonGuard v2/v3 bug. That entry
+  // had the SAME URL as the page under it, so popping onto it re-rendered the
+  // identical screen and read as a dead press.
+  //
+  // The difference is what the entry MEANS. One per open sheet, pushed only
+  // when a sheet actually opens, and popping it visibly closes that sheet. No
+  // press is ever dead, and nothing is pushed on a page with no sheet open.
+  const sheetDepth = sheetStack.length;
+  const historyDepth = useRef(0);
+  const selfPop = useRef(false);
+
+  useEffect(() => {
+    function onPop() {
+      // Our own history.go() below fires this too; that one is bookkeeping,
+      // not the person pressing Back.
+      if (selfPop.current) { selfPop.current = false; return; }
+      if (historyDepth.current > 0) {
+        historyDepth.current -= 1;
+        setSheetStack((prev) => prev.slice(0, -1));
+      }
+    }
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  useEffect(() => {
+    if (sheetDepth > historyDepth.current) {
+      for (let i = historyDepth.current; i < sheetDepth; i++) {
+        window.history.pushState({ symSheet: i + 1 }, "");
+      }
+      historyDepth.current = sheetDepth;
+    } else if (sheetDepth < historyDepth.current) {
+      // Closed from inside the app (✕, Save, Cancel). Give the entries back so
+      // the stack cannot grow every time a sheet is opened and shut.
+      const excess = historyDepth.current - sheetDepth;
+      historyDepth.current = sheetDepth;
+      selfPop.current = true;
+      window.history.go(-excess);
+      // If that go() produces no popstate — already at the bottom of the stack,
+      // say — the flag would stay armed and swallow the NEXT real Back. That is
+      // the dead-press failure this app has had twice. It cannot happen twice
+      // more for the sake of an unset boolean.
+      window.setTimeout(() => { selfPop.current = false; }, 300);
+    }
+  }, [sheetDepth]);
 
   // ---- inserted meals -----------------------------------------------------
   function freeInsertPosition(): number | null {
@@ -2332,7 +2411,24 @@ export default function NutritionV3Client(props: Props) {
                 <div className="sym-acts" style={{ marginTop: 9 }}>
                   {circleFor(row, i)}
                   <span className="sym-sp" />
-                  <button className="sym-bt" onClick={() => openSheet({ kind: "meal", rowKey: row.key })}>✎ Edit</button>
+                  {/* TWO BUTTONS, ONE BEHAVIOUR — until 13 Sep these were the
+                      same call, byte for byte, so the one labelled Edit opened
+                      the MENU and the actual editor was its seventh item.
+                      Dustin: "Edit button n 3 dots are same button...why?"
+
+                      Edit now opens the item editor; ⋯ is the menu, which is
+                      what a ⋯ means everywhere else. A row with nothing to edit
+                      (an empty slot, an option-based meal with no choice made)
+                      falls back to the menu rather than opening a sheet that
+                      renders nothing. */}
+                  <button
+                    className="sym-bt"
+                    onClick={() =>
+                      openSheet(canEditItems(row) ? { kind: "adjust", rowKey: row.key } : { kind: "meal", rowKey: row.key })
+                    }
+                  >
+                    ✎ Edit
+                  </button>
                   <button className="sym-bt ic" onClick={() => openSheet({ kind: "meal", rowKey: row.key })} aria-label="more">⋯</button>
                   <span
                     onPointerDown={(e) => onHandleDown(e, row.key)}

@@ -4526,3 +4526,54 @@ somebody walks a different distance.
 > clears that when the creator is the owner — so Dustin's own sessions become
 > library workouts, while a client's stay personal to them. Existing behaviour,
 > not changed here, but it is what "personal library" means in practice.
+
+
+### Nutrition — Edit vs ⋯, and the phone's Back  ·  13 Sep 2026
+
+Two reports, one screen, minutes apart. Inventory #31/#32 closed.
+
+**1. *"Edit button n 3 dots are same button...why?"*** Because they were, byte
+for byte — the same `openSheet({ kind: "meal", rowKey })` on both. The button
+labelled **Edit** opened the MENU (Swap, Replace, Copy to slot, Save to My
+Meals, Move, Delete) and the thing that actually edits the food was its seventh
+item, "✎ Edit items".
+
+| control | before | now |
+|---|---|---|
+| **✎ Edit** | opened the action menu | opens the **item editor** directly |
+| **⋯** | opened the action menu | unchanged — the action menu |
+
+A row with nothing to edit — an open slot, or a plan row whose option has not
+been chosen — still falls back to the menu, because `AdjustSheetView` renders
+nothing for those and Edit would otherwise open an empty sheet. `canEditItems()`
+tests the same two conditions that view does, and sits beside it so the pair
+cannot drift.
+
+**2. *"the back button on mobile goes back to home. That's not the previous
+screen so that breaks my rule about back button on mobile."*** His rule, set
+11 Sep: *"When you hit either button, it needs to go back one page — the
+previous screen you were looking at."*
+
+A sheet was not a history entry, so with one open, Back popped the whole
+Nutrition page and landed on Home. The previous screen he was looking at was
+this page with the sheet shut, and the control everyone actually uses could not
+reach it. `BackButtonGuard` does not cover this — it only binds inside a
+Capacitor shell, and Capacitor is deliberately out of `package.json`, so on a
+phone this is Chrome's own Back and nothing was listening.
+
+**Now:** one history entry per open sheet. Back pops **one level**, so two deep
+(menu → editor) it lands on the menu. Closing from inside the app (✕, Save,
+Cancel) hands the entries back, so the stack cannot grow with every open and
+shut.
+
+> ⚠️ **This is not the sentinel `backFromHere.ts` forbids in capitals.** That one
+> was pushed on a PAGE with the same URL, so popping it re-rendered the
+> identical screen and read as a dead press — the BackButtonGuard v2/v3 bug.
+> Here every entry corresponds to a sheet that is actually open, and popping one
+> visibly closes it. Nothing is pushed when no sheet is open, and the self-pop
+> flag times out after 300ms so a swallowed `popstate` can never arm a dead
+> press.
+
+**Still to do:** the same treatment for sheets on other screens (`AddWorkoutButton`,
+`WorkoutDaySheet`, `AIAssistant`, the zoom overlays). This fixes the screen he
+reported it on; the rule is app-wide.
