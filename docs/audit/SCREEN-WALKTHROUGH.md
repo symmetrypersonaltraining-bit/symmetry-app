@@ -4722,3 +4722,86 @@ beginning `0` **is** a UPC-A, and a scanner returns it as twelve digits with the
 leading zero dropped. `barcodeCandidates()` has looked codes up under every GTIN
 zero-padding since 6 Sep, so nothing downstream cares — but the next person to
 see `049000042566` come back from `0049000042566` should not go hunting.
+
+---
+
+## Interlude — "9 ready to send" was nine invoices already paid  ·  14 Sep 2026
+
+Dustin, looking at **Today's Admin** on the trainer home:
+
+> *"Wording is not right, 9 are not 'ready to send' they're still in provisional
+> period"*
+
+The card read **"Payments outstanding — 3 · 3 sent, not confirmed paid. 9 ready
+to send."**
+
+The 3 were right: Grant Weever (14 Sep), Madeleine Coker (15 Sep) and Lesly
+Spencer (18 Sep), all sent and unanswered.
+
+### The 9 were finished business
+
+Every one of them was **already paid**, with `notification_status: 'paid'` and a
+`paid_confirmed_at` timestamp on the row. Eight were July invoices — 7, 9, 9,
+12, 14, 15, 18 and 21 July, the oldest sixty-nine days old. The ninth was Mary
+Ellen Joseph's 10 Sep invoice, paid before the row was created.
+
+The filter asked one question:
+
+```js
+!p.reminder_sent_at && p.due_date <= addDays(today, 7)
+```
+
+A payment he is simply **handed** — cash, or a transfer that lands, and he marks
+it paid — never gets a `reminder_sent_at`. So it passed `!reminder_sent_at`
+forever. The bucket could only grow: it went 8 → 9 the morning Mary Ellen's
+first invoice was created, and every future payment taken that way adds one.
+
+So the card had been telling him, for two months, to go and chase money he had
+already been given.
+
+### And the word he reached for was the state the card could not see
+
+*Provisional* is real in this app. A cycle closes **seven days before the due
+date** and the amount moves until it does — every orange cancellation mark
+changes it. `/api/reminders/send` refuses a send before then (Dustin, 20 Aug:
+*"add back in provisional windows on payments so I cant send until 7 days
+before"*) and `ReminderEditor` badges those rows `PROVISIONAL — can send from
+<date>`.
+
+Thirteen invoices were sitting in exactly that state — Hassan Kareem 22 Sep
+through Jennifer Day 30 Oct — and Today's Admin had no vocabulary for it. The
+only bucket it owned was "ready to send", so the state he was actually thinking
+about was invisible and the nine it did count were the wrong nine. His reading
+was the only one the card left open.
+
+### What a user sees now
+
+The row sorts every reminder into four states, and says the true one:
+
+| state | counted as |
+|---|---|
+| paid, skipped or paused | **nothing.** There is no work in a closed invoice |
+| sent, not confirmed paid | *awaiting* — *overdue* once the due date passes |
+| unsent, cycle **closed** | **ready to send** — the only actionable bucket |
+| unsent, cycle **still open** | **still provisional**, named with the date it opens |
+
+Today it reads **"Payments outstanding — 3 · 3 sent, not confirmed paid. 13
+still provisional, can send from Sep 15."**
+
+Provisional deliberately **cannot raise the row on its own**. An invoice he is
+forbidden to send is not admin; it is context, and it only appears when the row
+is already up for a reason. A row that can never clear is wallpaper, which is
+rule 1 of this screen.
+
+The count chip also no longer reads "0": with nothing overdue and nothing
+awaiting it fell through to `String(0)` while the sentence underneath claimed
+nine were ready.
+
+### Proven, not assumed
+
+`tests/unit/theMoneyRowCountsWhatYouCanActuallySend.test.ts` runs the real rows
+— those nine paid July invoices, the three sent reminders, the thirteen
+provisional ones. The sorting lives in `src/lib/payments/adminMoney.ts` rather
+than inside the component so it can be run against them at all, which is the
+only way the nine was ever going to be caught. The old filter, given the same
+nine rows, returns 9.
