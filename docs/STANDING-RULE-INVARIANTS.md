@@ -172,6 +172,52 @@ A fixed 7-day window was tried first and was still wrong: booked through the 4th
 and programmed through October means a session on the 7th is next week's booking
 he has not made yet, not an unbooked session.
 
+## Three billing setups that look wrong and are not — 14 Sep 2026
+
+From a "who am I training without payment set up?" sweep. All three came back
+clean; Dustin's rulings below. **Do not raise any of them again.**
+
+### Greg Lennon has no billing because he is not billed through the app
+
+> *"Leave Greg as is i dont run his through the app."* — Dustin, 14 Sep 2026
+
+He trains alongside Celeste Lennon and her calendar event — **"Celeste + Greg
+$350"** — covers both. His own `clients` row is deliberately
+`billing_type: 'none'` with no rate, and his notes have said so all along:
+*"Celeste's payment covers both."*
+
+A sweep looking for "trains but has no payment event" will find him every time.
+It is finding a person, not a problem. `billing_type: 'paid_by_other'` exists and
+was offered; he declined it, because the money does not go through the app at
+all and a label suggesting otherwise is worse than none.
+
+### Stacie Weever's reminders are off ON PURPOSE
+
+> *"Stacie is paused for a while."* — Dustin, 14 Sep 2026
+
+Full billing is configured — `monthly_adjusted`, $80, $640/month — and
+`payment_reminders_enabled` is **false** with her October reminder sitting at
+`notification_status: 'paused'`. That combination is the intended state of a
+paused client, not a half-finished setup. Leave both alone until he says she is
+back.
+
+### Sharon Rambo's two payment series are one bill, split
+
+Two separate monthly recurring events, both **"Sharon Rambo $300"**, on the 7th
+and the 23rd. That is her $600 billed semi-monthly, and
+`expected_sessions_per_cycle: 4` is the half-cycle it matches — not the 8 her
+2x/week frequency would imply.
+
+It looks exactly like an accidental duplicate series (see the handoff for a real
+one, created and removed the same day). Check the dates before calling it: a true
+duplicate lands on the SAME day of the month; hers are sixteen days apart.
+
+### And the one that was real: Laurie Kane
+
+Training with no billing of any kind — no rate, no payment event, no start date,
+reminders off. Raised 14 Sep; his answer was *"Leave the rest as is."* Recorded
+so the next sweep knows it has already been put to him, not so it gets put again.
+
 ## Erin Arit is not a client yet
 
 She has not confirmed signing up ("I have not recieved confirmation she is

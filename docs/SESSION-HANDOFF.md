@@ -719,6 +719,68 @@ insecure origin, or a WebView never granted the camera at all).
 **For him to test:** Nutrition → a meal → **Edit items** → the barcode button →
 the camera should come up and read a packet.
 
+### 💵 14 Sep — Mary Ellen's billing, and the duplicate payment series trap
+
+**Her setup is live:** $87.50 × 4 = **$350/month**, `monthly_adjusted`, anchor
+day 10, `training_frequency` and `days_per_week` both 1. September's payment is
+recorded as paid (10 Sep, $350, `notification_status: 'paid'`) so the generator
+cannot raise a reminder for a settled cycle. Her Wednesday pattern is in
+`client_training_patterns` — weekday 3, supervised, from 10 Sep — read off her
+own data rather than invented: the supervised "Foundations" sessions on 23 and
+30 Sep and 7 Oct were the only supervised ones and all fell on Wednesdays.
+
+Old row backed up to `bak_maryellen_billing_20260914`.
+
+> ⚠️ **BILLING DOES NOT COME FROM `billing_anchor_day`.** This is the thing to
+> know before setting anyone up. `generate_due_payment_reminders()` reads
+> **`calendar_payments`**, which the gcal sync fills from recurring **Google
+> Calendar events** titled `"<Client Name> $<amount>"`. Setting the anchor day on
+> the client row alone bills nobody. Every one of the 15 billed clients works
+> this way.
+
+> 🔁 **AND CHECK FOR AN EXISTING SERIES FIRST.** Dustin created
+> "Mary Ellen Joseph**b** $350" (typo) four minutes before this session created
+> "Mary Ellen Joseph $350". Two overlapping monthly series on the same day =
+> double billing from October. Resolved by deleting the session's event, fixing
+> the typo on his, and clearing the 24 orphaned `calendar_payments` rows. The
+> sync's `matchClient` still attached the typo'd event to her — it falls back to
+> **first name alone** when the full name misses — which is the same forgiveness
+> that rescued "Sarah Prince", and the same forgiveness that would attach a
+> typo'd event to the WRONG client if two shared a first name.
+
+**The sweep that followed** — who is being trained without payment set up — found
+one real gap (Laurie Kane) and three false alarms. All four rulings are recorded
+in `docs/STANDING-RULE-INVARIANTS.md` under "Three billing setups that look wrong
+and are not". Read that before running such a sweep again.
+
+**Open for whoever picks up the billing code:** Jennifer Day, Tyler Dorsett and
+Madeleine Coker are `flat` with **no `session_rate`**. The new cancellation
+policy credits "your rate minus one session"; for those three there is no
+per-session figure to subtract.
+
+### 📧 14 Sep — the cancellation-policy email to clients
+
+Drafted in Gmail (not sent): "A change to how I handle cancellations". BCC to the
+15 monthly clients, Dustin in To. A copy plus the reasoning is in Drive as
+*Symmetry — Cancellation & Billing Change — Client Email (Draft)*.
+
+**The policy, which is also the spec if the billing code is changed to match:**
+a client is credited only when the month finishes **below the sessions their rate
+covers**. A 10-session month absorbs two cancellations free, because those two
+were never charged for.
+
+Deliberately NOT written as "2 free cancellations a month" — the number of spare
+sessions depends on the calendar (8, 9 or 10 of their days), and "2 free" would
+give away two in a month that only holds 8.
+
+**No dollar figures in it.** The published rate card (`Symmetry_Pricing_2026.pdf`)
+says 2 days/week is $700/$88; the 13 monthly clients actually pay $75–$87.50. Any
+single figure would read as a price rise to most of them and expose one tier's
+price to another. Session COUNTS (8/12/20) are used instead — true for everyone.
+
+**The billing code has NOT been changed to match this policy.** That was left
+until he settles it.
+
 ### 🚨 SHIPPED 13 Sep evening — the coach said "Done." and wrote nothing (#89, #90)
 
 Dustin, 3:12pm Central, in the ✦ Coach: *"log a 3 mile hike for my cardio
