@@ -4615,3 +4615,105 @@ Payments, Trainer calendar, Saturday review, Trainer week digest. Same hook,
 same one-line change; they are desktop-first, which is why they are second.
 Takeovers (`ClientTakeovers`, `AssessmentGate`, `AiLimitTakeover`) are
 deliberately excluded — a gate that Back dismisses is not a gate.
+
+---
+
+## Interlude — the barcode scanner had never worked on his phone (14 Sep 2026)
+
+Dustin, 14 Sep: ***"Edit items bar code scanner doesn't work chevk the log."***
+
+### The log had nothing, and that was the first finding
+
+`app_error_log` held four rows in total and not one of them was a barcode. The
+scanner had never written to it. Nor had the server: `/api/nutrition-ai/
+barcode-lookup` had no record of a request, which said the failure happened in
+the browser before anything was sent.
+
+So the instruction — *check the log* — could not be carried out, which is the
+same shape as the sync card and the AI audit log earlier this week: a thing that
+reports a problem, with nothing behind it.
+
+### What the log DID have was his user agent
+
+From an unrelated `render / network error` on 10 Sep, on his own account:
+
+```
+Mozilla/5.0 (Linux; Android 16; SM-S938U Build/BP4A.251205.006; wv) …
+                                                               ^^
+```
+
+`wv` is **Android WebView** — the shell — not Chrome. And `BarcodeDetector`, the
+only decoder this screen had, exists in Chrome for Android and **does not exist
+in WebView**. It has also never existed in any version of iOS Safari, which is
+what the two iPhone rows in that same table are running.
+
+The code did exactly what it was written to do:
+
+```ts
+const Ctor = detectorCtor();
+if (!Ctor) return;              // no BarcodeDetector → no camera at all
+```
+
+`supported` was false, the status started at `"error"`, and the scanner opened
+straight onto a black screen, a text box and the phone keyboard. That is the
+screenshot he sent.
+
+**It was not broken that day. It had only ever worked on Chrome for Android** —
+which is nobody using this app, him included.
+
+### What changed
+
+`src/lib/nutrition/barcodeDecode.ts` is new and decides the decoder:
+
+| Browser | Decoder | Cost |
+|---|---|---|
+| Chrome for Android, macOS/ChromeOS Chrome | native `BarcodeDetector` | free, hardware accelerated |
+| Android WebView, iOS Safari, everything else | ZXing, decoding the frame in JS | ~200 KB, fetched only on those devices |
+
+The ZXing import is dynamic, so the nutrition bundle is unchanged for everyone
+and the chunk only ever reaches a phone that needs it. The scan loop, the
+reticle, the three-agreeing-frames rule from 24 Aug and the check-digit test are
+all untouched — only *what decodes the frame* moved.
+
+Pinned to `@zxing/library@0.21.3` deliberately. 0.23.0 `console.warn`s on every
+frame that finds nothing — an `instanceof` that cannot match, since
+`NotFoundException` and `ReaderException` are siblings — which at 30fps is a
+hundred and fifty warnings a second on the phone doing the scanning.
+
+### What a user sees now
+
+- Tap the barcode button in **Food database** (search sheet or the empty-result
+  card) → the rear camera comes up, on any phone.
+- Line the barcode up in the reticle → it reads and goes to the serving picker,
+  same as before.
+- The typed-number box is still there under the camera, for a torn or curved
+  label.
+- The camera fallback screen no longer says *"Live scan works best on Android /
+  Chrome."* That was true of the old build and is not of this one.
+
+### And the log answers this next time
+
+Every reason the camera does not come up is now a row under scope `barcode`,
+carrying which decoder was in play and what the browser offered:
+`has_barcode_detector`, `has_media_devices`, `secure_context`, `standalone`.
+The stage leads the message so a refused permission and a missing camera API
+group as different faults rather than one:
+
+- `no decoder` — neither the native API nor ZXing could be loaded
+- `camera denied` — `NotAllowedError` / `SecurityError`, i.e. the permission
+- `camera unavailable` — including `NoCameraApiError`, which is an insecure
+  origin or a WebView whose host app was never granted the camera at all
+
+### Proven, not assumed
+
+`tests/unit/aBarcodeScansOnAPhoneThatIsNotChrome.test.ts` draws a real EAN-13
+from the specification — guard bars, parity pattern, quiet zones — and decodes
+it in Node with no browser, no camera and no `BarcodeDetector` in the process.
+Run against the old behaviour (no decoder when the native one is missing) it
+fails; against this it passes.
+
+It also pins down one thing that would otherwise read as a misread: an EAN-13
+beginning `0` **is** a UPC-A, and a scanner returns it as twelve digits with the
+leading zero dropped. `barcodeCandidates()` has looked codes up under every GTIN
+zero-padding since 6 Sep, so nothing downstream cares — but the next person to
+see `049000042566` come back from `0049000042566` should not go hunting.

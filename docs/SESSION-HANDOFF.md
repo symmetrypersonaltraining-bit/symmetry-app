@@ -54,11 +54,14 @@ and do not create another one.
 > The biggest number left in the food work is keyword coverage: **68,383 rows
 > still say "1 serving"** (counted 9 Sep). Section 5, "Known gaps".
 
-Last updated: **13 Sep 2026, evening Central** · `main` = `05c6c40` (#91). **Section 5 leads
-with the 13 Sep entry: every AI path that produces a macro now reads it from a
-row** (#72, #73, #74), on top of the 12 Sep restaurant lookup (#69, #70).
-Behind it: `9c9283e` (plan drift), `ef2af5d` (restaurant plate), `3452718`
-(logger's failed tick), and the audit session's Nutrition commits.
+Last updated: **14 Sep 2026, early hours Central** · **Section 5 leads with #98 — the
+barcode scanner had never worked on his phone**, because it was built on
+`BarcodeDetector` and he is on an Android WebView shell. Behind it, 13 Sep
+evening: #96 (nothing posts your workout for you, every celebration has a face),
+#95, #94, #91, and the 13 Sep entry: every AI path that produces a macro now
+reads it from a row (#72, #73, #74), on top of the 12 Sep restaurant lookup
+(#69, #70). Behind those: `9c9283e` (plan drift), `ef2af5d` (restaurant plate),
+`3452718` (logger's failed tick), and the audit session's Nutrition commits.
 
 > 💼 **11 Sep, late: the business plan and the accounting sheet are in his
 > Drive.** Both in the folder "Symmetry Investor Package"
@@ -663,6 +666,58 @@ and watching it come back. Without that, Monday 08:50 undoes it.
 that keeps biting: his other session pushes to this repo while you work, so find
 out where `main` actually is before you write a line. On the evening of 9 Sep it
 landed `547a544` mid-session, while this one was reading.
+
+### 🚨 SHIPPED 14 Sep — the barcode scanner had never worked on his phone (#98)
+
+Dustin, 14 Sep: *"Edit items bar code scanner doesn't work chevk the log."*
+
+**The log had nothing, and that was finding one.** The scanner had never written
+to `app_error_log`, and `/api/nutrition-ai/barcode-lookup` had no record of a
+request — so it failed in the browser before anything was sent.
+
+**What the log DID have was his user agent**, from an unrelated crash on 10 Sep
+on his own account:
+
+```
+Mozilla/5.0 (Linux; Android 16; SM-S938U Build/BP4A.251205.006; wv) …
+                                                               ^^
+```
+
+`wv` is **Android WebView**, not Chrome. `BarcodeDetector` — the only decoder
+this screen had — exists in Chrome for Android and **does not exist in
+WebView**, and has never existed in any version of iOS Safari, which is what the
+iPhone clients in that same table are on. `detectorCtor()` returned null, the
+camera was never started, and the scanner opened straight onto a keyboard.
+
+**It was not broken that day. It had only ever worked on Chrome for Android** —
+which is nobody using this app, him included.
+
+**Now:** `src/lib/nutrition/barcodeDecode.ts` picks the decoder — native where
+it exists, ZXing decoding the frame everywhere else. The ZXing import is
+dynamic; measured over two full builds, the nutrition page's initial JS goes
+964K → 968K and ZXing's 404K chunk is in no initial bundle. The scan loop, the
+reticle, the three-agreeing-frames rule from 24 Aug and the check-digit test are
+unchanged.
+
+> ⚠️ **`@zxing/library` is pinned to 0.21.3 on purpose. Do not bump it.**
+> 0.23.0 `console.warn`s on every frame that finds nothing — `NotFoundException`
+> and `ReaderException` are siblings, so its `instanceof` can never match —
+> which at 30fps is 150 warnings a second on the phone doing the scanning.
+
+**And "check the log" has an answer next time.** Every reason the camera does
+not come up is a row under scope `barcode` carrying the decoder in play plus
+`has_barcode_detector`, `has_media_devices`, `secure_context`, `standalone`.
+Three stages, which group as separate faults: `no decoder`, `camera denied`
+(the permission), `camera unavailable` (including `NoCameraApiError` — an
+insecure origin, or a WebView never granted the camera at all).
+
+> 💡 **The reusable lesson: his phone is an Android WebView shell, and the
+> clients are on iOS Safari.** Any browser API added from here gets checked
+> against BOTH before it is built on. This is the second one — speech
+> recognition was the first.
+
+**For him to test:** Nutrition → a meal → **Edit items** → the barcode button →
+the camera should come up and read a packet.
 
 ### 🚨 SHIPPED 13 Sep evening — the coach said "Done." and wrote nothing (#89, #90)
 
