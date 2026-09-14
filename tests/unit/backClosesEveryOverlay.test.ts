@@ -41,11 +41,29 @@ const ON_THE_HOOK = [
   "src/components/ProgressPhotos.tsx",
 ];
 
+/** Trainer-side modals, second batch. */
+const TRAINER_SIDE = [
+  "src/app/(app)/clients/NewClientModal.tsx",
+  "src/app/(app)/clients/[clientId]/AssignProgramModal.tsx",
+  "src/app/(app)/clients/[clientId]/InviteClientButton.tsx",
+  "src/app/(app)/schedule/ScheduleClient.tsx",
+  "src/app/(app)/payments/PaymentsClient.tsx",
+  "src/app/(app)/recipes/RecipesClient.tsx",
+  "src/app/(app)/library/exercises/ExerciseLibraryClient.tsx",
+  "src/components/SaturdayReview.tsx",
+];
+
 /** Already correct before this, by the same pattern. Left alone deliberately. */
 const ALREADY_HANDLED = ["src/components/VideoZoom.tsx", "src/components/ChartZoom.tsx"];
 
 describe("back closes every overlay", () => {
   for (const f of ON_THE_HOOK) {
+    it(`${f.split("/").pop()} answers Back`, () => {
+      assert.match(read(f), /useBackClosesOverlay\(/, `${f} no longer closes on Back`);
+    });
+  }
+
+  for (const f of TRAINER_SIDE) {
     it(`${f.split("/").pop()} answers Back`, () => {
       assert.match(read(f), /useBackClosesOverlay\(/, `${f} no longer closes on Back`);
     });

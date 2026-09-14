@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Logo from "@/components/Logo";
+import { useBackClosesOverlay } from "@/lib/nav/useBackClosesOverlay";
 
 interface Exercise {
   id: string;
@@ -54,6 +55,9 @@ function ExerciseDrawer({ ex, onClose }: { ex: Exercise; onClose: () => void }) 
   const color = MODALITY_COLOR[ex.modality?.toLowerCase() || ""] || "var(--brand-primary)";
   const ytThumb = getYouTubeThumbnail(ex.video_url);
   const ytId = ex.video_url ? (ex.video_url.match(/(?:watch\?v=|youtu\.be\/|embed\/|shorts\/)([^&?#]+)/)?.[1] || null) : null;
+
+  // Back closes this rather than leaving the page — lib/nav/useBackClosesOverlay.ts.
+  useBackClosesOverlay(1, onClose);
 
   return (
     <div className="fixed inset-0 z-[1000] flex items-end lg:items-center justify-center"

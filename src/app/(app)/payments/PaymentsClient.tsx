@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { markClientPaid, setPaymentStatus, updateAmountDue } from "./paymentActions";
 import { centralToday, centralFormatDate, shiftDate } from "@/lib/central-time";
+import { useBackClosesOverlay } from "@/lib/nav/useBackClosesOverlay";
 
 interface ReminderSummary {
   id: string;
@@ -100,6 +101,9 @@ function ConfirmModal({ client, onClose, onSent }: ConfirmModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Back closes this rather than leaving the page — lib/nav/useBackClosesOverlay.ts.
+  useBackClosesOverlay(1, onClose);
 
   useEffect(() => { inputRef.current?.select(); }, []);
 

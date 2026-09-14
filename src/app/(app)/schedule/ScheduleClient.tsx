@@ -6,6 +6,7 @@ import { updateGCalEvent, deleteGCalEvent } from "./scheduleActions";
 import { centralIso, centralFormatDate } from "@/lib/central-time";
 import { logCardioSession, logStrengthSession } from "./actions";
 import ManualWorkoutBuilder from "@/components/ManualWorkoutBuilder";
+import { useBackClosesOverlay } from "@/lib/nav/useBackClosesOverlay";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -104,6 +105,9 @@ function EditDrawer({ appt, onClose, onSaved }: DrawerProps) {
   const [endTime, setEndTime] = useState(appt.endTime ?? "");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  // Back closes this rather than leaving the page — lib/nav/useBackClosesOverlay.ts.
+  useBackClosesOverlay(1, onClose);
 
   const handleUpdate = (updateSeries: boolean) => {
     if (!appt.gcalEventId) {
