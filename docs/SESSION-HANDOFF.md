@@ -667,6 +667,58 @@ that keeps biting: his other session pushes to this repo while you work, so find
 out where `main` actually is before you write a line. On the evening of 9 Sep it
 landed `547a544` mid-session, while this one was reading.
 
+### 💸 SHIPPED 14 Sep — "9 ready to send" was nine invoices already paid (#101)
+
+Dustin, on the trainer home: *"Wording is not right, 9 are not 'ready to send'
+they're still in provisional period"*.
+
+The card read **"Payments outstanding — 3 · 3 sent, not confirmed paid. 9 ready
+to send."** The 3 were right. **The 9 were all already PAID** —
+`notification_status: 'paid'` with a `paid_confirmed_at` on the row. Eight were
+July invoices (7, 9, 9, 12, 14, 15, 18, 21 July), the oldest 69 days old; the
+ninth was Mary Ellen's 10 Sep invoice, paid before the row was created. So the
+count had also gone 8 → 9 that same morning, from this session's own write.
+
+**Why, and it is worth remembering for any bucket built on this table.** The
+filter asked one question — `!p.reminder_sent_at && p.due_date <= today + 7`.
+**A payment he is HANDED never gets a `reminder_sent_at`**: cash, or a transfer
+that lands, and he marks it paid without a reminder ever going out. That row
+then passes `!reminder_sent_at` forever. The bucket could only grow, and the
+card spent two months telling him to chase money he already had.
+
+**And "provisional" was the state the card had no word for.** The cycle closes
+**seven days before the due date** and the amount moves until it does;
+`/api/reminders/send` refuses a send before then (20 Aug: *"add back in
+provisional windows on payments so I cant send until 7 days before"*) and
+`ReminderEditor` badges those rows `PROVISIONAL — can send from <date>`.
+Thirteen invoices were in exactly that state (Hassan Kareem 22 Sep → Jennifer
+Day 30 Oct) and Today's Admin could not see it, so the only bucket it owned was
+the wrong one. His reading was the only one the card left open.
+
+The sorting now lives in **`src/lib/payments/adminMoney.ts`** — out of the
+component so it can be run against the real rows, which is the only way this was
+ever going to be caught:
+
+| state | counted as |
+|---|---|
+| `paid` / `skipped` / `paused`, or any `paid_confirmed_at` | **nothing** |
+| sent, not confirmed paid | *awaiting* (→ *overdue* past the due date) |
+| unsent, cycle **closed** | **ready to send** — the only actionable bucket |
+| unsent, cycle **still open** | **still provisional**, with the date it opens |
+
+It now reads *"3 sent, not confirmed paid. 13 still provisional, can send from
+Sep 15."* Provisional **cannot raise the row on its own** — an invoice he is
+forbidden to send is context, not admin, and a row that never clears is
+wallpaper. The count chip also no longer showed `0` while the sentence under it
+claimed nine were ready.
+
+Test: `tests/unit/theMoneyRowCountsWhatYouCanActuallySend.test.ts`, on those
+exact rows. Write-up in `docs/audit/SCREEN-WALKTHROUGH.md`.
+
+**If seven days ever moves, it moves in three places** — `adminMoney.ts`,
+`reminder-calc.ts` (`cycleEnd`) and the send route's lock — or the card starts
+offering sends the route refuses.
+
 ### 🚨 SHIPPED 14 Sep — the barcode scanner had never worked on his phone (#98)
 
 Dustin, 14 Sep: *"Edit items bar code scanner doesn't work chevk the log."*
