@@ -256,26 +256,20 @@ export class AiPaused extends Error {
  * global kill switch alone.
  */
 /**
- * ⏳ TEMPORARY — THE PLAN-BUILDER TEST WINDOW. DELETE AFTER 14 SEP 2026.
+ * The default for a feature, with no date in it any more.
  *
- * Dustin, 11 Sep 2026: *"temporarily, we need to bump it to, like, ten times a
- * day so that I can test this out from every angle. I wanna test out every
- * single button in here. So bump it up to ten times per day right now, but put
- * a reminder somewhere that we cannot miss in maybe three days to bring it
- * back down to three times per day per client."*
+ * It took a date for three days. Dustin, 11 Sep 2026, wanted the plan builder
+ * at ten a day while he tested every button in it, and three a day afterwards
+ * — *"put a reminder somewhere that we cannot miss in maybe three days to
+ * bring it back down"*. So the window expired by calendar rather than by
+ * anyone remembering, and planBuildLimitIsThree.test.ts went red on 15 Sep
+ * until the block was deleted. It was, that morning. This is what is left.
  *
- * So: ten a day for every client through 14 Sep, then the permanent three,
- * with no human action needed for the number to come back down — the date does
- * it. What DOES need a human is deleting this block afterwards, and the
- * reminder that cannot be missed is planBuildLimitIsThree.test.ts: from 15 Sep
- * it fails while this constant still exists. A Routine also wakes a session
- * that morning to do exactly that.
+ * `today` stays in the signature because every caller passes the Central date
+ * it already computed, and a limit that silently reads its own clock is how
+ * "after 7pm Central the UTC date is already tomorrow" gets into a cap.
  */
-export const PLAN_BUILD_TEST_WINDOW = { limit: 10, until: "2026-09-14" } as const;
-
-/** The default for a feature on a given Central date — see the window above. */
-export function defaultLimitFor(feature: AiFeature, today: string = chicagoToday()): number | null {
-  if (feature === "plan_build" && today <= PLAN_BUILD_TEST_WINDOW.until) return PLAN_BUILD_TEST_WINDOW.limit;
+export function defaultLimitFor(feature: AiFeature, _today: string = chicagoToday()): number | null {
   return DEFAULT_LIMITS[feature];
 }
 

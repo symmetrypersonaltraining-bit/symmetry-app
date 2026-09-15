@@ -2,19 +2,21 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { DEFAULT_LIMITS, defaultLimitFor, resolveDailyLimit, chicagoToday } from "../../src/lib/ai/meter-core";
+import { DEFAULT_LIMITS, defaultLimitFor, resolveDailyLimit } from "../../src/lib/ai/meter-core";
 
 /**
- * THREE PLANS A DAY, TEN WHILE HE TESTS — AND A REMINDER THAT CANNOT BE MISSED.
+ * THREE PLANS A DAY, AND THE TEST WINDOW IS GONE FOR GOOD.
  *
  * Dustin, 11 Sep 2026: *"let's do three times per day permanently. But
  * temporarily we need to bump it to ten times a day so I can test this out
  * from every angle… put a reminder somewhere that we cannot miss in maybe
  * three days to bring it back down."*
  *
- * The number comes back down by itself on 15 Sep — the date does that. This
- * file is the reminder to delete the temporary code afterwards: the last test
- * goes RED on main from 15 Sep until PLAN_BUILD_TEST_WINDOW is gone.
+ * The reminder worked exactly as built. PLAN_BUILD_TEST_WINDOW expired by
+ * calendar on 14 Sep, this file went red on main on the 15th, and the block was
+ * deleted that morning. What was a five-test file is these four: the temporary
+ * half is gone and the permanent rule it was protecting is still here, because
+ * deleting the reminder should not delete the thing it was reminding us about.
  */
 const SRC = readFileSync(join(process.cwd(), "src/lib/ai/meter-core.ts"), "utf8");
 
@@ -22,30 +24,23 @@ test("the permanent limit is three a day", () => {
   assert.equal(DEFAULT_LIMITS.plan_build, 3, "it was 1; he ruled 3");
 });
 
-test("inside the test window it is ten, and the day after it is three again", () => {
-  assert.equal(defaultLimitFor("plan_build", "2026-09-11"), 10);
-  assert.equal(defaultLimitFor("plan_build", "2026-09-14"), 10, "the 14th is the last day");
-  assert.equal(defaultLimitFor("plan_build", "2026-09-15"), 3, "the 15th needs no human");
+test("and no date can change it any more", () => {
+  for (const d of ["2026-09-11", "2026-09-14", "2026-09-15", "2027-01-01"]) {
+    assert.equal(defaultLimitFor("plan_build", d), 3, `${d} must be three like every other day`);
+  }
+  assert.ok(!SRC.includes("PLAN_BUILD_TEST_WINDOW"), "the temporary window is back in meter-core.ts");
 });
 
-test("a per-client column still wins over either default", () => {
+test("a per-client column still wins over the default", () => {
+  // This is the one that matters in practice: on 15 Sep every real client
+  // carried ai_daily_plan_build_limit = 1, set back when 1 WAS the rule, so the
+  // ruling to 3 reached nobody and the ten-a-day window reached nobody either.
+  // The column is the answer, not the default.
   assert.equal(resolveDailyLimit({ ai_daily_plan_build_limit: 10 }, "plan_build", "2026-10-01"), 10);
+  assert.equal(resolveDailyLimit({ ai_daily_plan_build_limit: 1 }, "plan_build", "2026-10-01"), 1);
   assert.equal(resolveDailyLimit({}, "plan_build", "2026-10-01"), 3);
 });
 
-test("the window only touches the plan builder", () => {
+test("the plan builder is not special in any other way", () => {
   assert.equal(defaultLimitFor("coach_action", "2026-09-12"), DEFAULT_LIMITS.coach_action);
-});
-
-test("⏳ THE REMINDER: after 14 Sep 2026 the temporary window must be deleted", () => {
-  // This is the thing he asked for — a reminder nobody can miss. It fails on
-  // main from 15 Sep until the block in meter-core.ts is removed. When it
-  // fires: delete PLAN_BUILD_TEST_WINDOW and the plan_build branch in
-  // defaultLimitFor, set Test Client's client_app_settings.ai_daily_plan_build_limit
-  // back to NULL, delete this test, and tell Dustin it is back to three.
-  if (chicagoToday() > "2026-09-14") {
-    assert.ok(!SRC.includes("PLAN_BUILD_TEST_WINDOW"),
-      "The plan-builder test window ended on 14 Sep 2026. Delete PLAN_BUILD_TEST_WINDOW from meter-core.ts, "
-      + "reset Test Client's ai_daily_plan_build_limit to NULL, and remove this test.");
-  }
 });
