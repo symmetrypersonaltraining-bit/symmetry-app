@@ -2728,6 +2728,13 @@ export default function WorkoutLogger({
     // so the session view always shows the same fields as the edit/preview screen.
     const chipList: string[] = isCardioEx(currentExercise) ? ["time", "speed", "hr"] : ["weight", "reps", "time", "distance", "each_side"];
     for (const f of xFields) if (!chipList.includes(f) && ["weight", "reps", "time", "speed", "hr", "distance", "each_side"].includes(f)) chipList.push(f);
+    // Is there any prescription to show? An empty pinned row costs 20px of
+    // dead space above the sets on every movement with no volume, tempo, load,
+    // rest or cue on it — and that is most bodyweight work.
+    const hasMeta = Boolean(
+      currentExercise.volume_value || currentExercise.tempo || currentExercise.load_descriptor ||
+      xFields.includes("each_side") || restLabel(currentExercise.rest) || currentExercise.cue,
+    );
 
     return (
       <div
@@ -3031,55 +3038,78 @@ export default function WorkoutLogger({
               <AiBadge size={22} mood="lifting" title="" />
             </button>
           </div>
+          {/* THE PRESCRIPTION IS PINNED TOO.
+
+              Dustin, 15 Sep, on Stacie's Battle Rope Alternating Waves: "Page
+              is cut off on this one." The screenshot shows the pill row sliced
+              through the middle — "30s on / 30s off" and "straight into the
+              next movement" each cut in half under the Track row, looking like
+              something was overlapping them.
+
+              Nothing was overlapping. These pills were the ONLY content in the
+              shrinkable scroll box, and flex-shrink:1 + min-h-0 lets a box
+              collapse to nothing when the pinned sets and footer want the
+              space. A three-line movement name, the Timer/Stopwatch switch and
+              four timed sets left it about ten pixels tall, so ten pixels of a
+              pill is what you saw.
+
+              This is the Gerard 8/4 fault exactly, one element further down —
+              that time it was the NAME that got scrolled into a region with no
+              height. The answer is the same one. On a timed movement the
+              prescription IS the instruction: "30s on / 30s off" is the whole
+              exercise, and a client who cannot read it cannot do the set. So it
+              is pinned, with the name and the sets.
+
+              Only the expanded cue stays scrollable. It is opt-in, it is the
+              one genuinely unbounded thing here, and it is a sentence ABOUT the
+              movement rather than the movement itself. */}
+          {hasMeta && (
+            <div className="flex gap-1.5 mt-2 mb-3 flex-wrap items-center">
+              {currentExercise.volume_value && (
+                <span className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: "rgba(14,165,233,0.15)", color: "var(--brand-primary)" }}>{currentExercise.volume_value}</span>
+              )}
+              {currentExercise.tempo && (
+                <span className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)" }}>{currentExercise.tempo}</span>
+              )}
+              {currentExercise.load_descriptor && (
+                <span className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)" }}>{currentExercise.load_descriptor}</span>
+              )}
+              {xFields.includes("each_side") && (
+                <span className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: "rgba(14,165,233,0.15)", color: "var(--brand-primary)" }}>Each side</span>
+              )}
+              {/* Rest reaches session mode too, and only on a tap. Without this
+                  the whole view had no timer at all once the automatic one went. */}
+              {restLabel(currentExercise.rest) && (
+                isImmediate(currentExercise.rest)
+                  ? <span className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: "rgba(14,165,233,0.15)", color: "var(--brand-primary)" }}>{restLabel(currentExercise.rest)}</span>
+                  : <button type="button" onClick={e => { e.stopPropagation(); startRest(currentExercise); }}
+                      className="text-[11px] px-2 py-0.5 rounded-full"
+                      style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)" }}>
+                      {restLabel(currentExercise.rest)}{" \u00b7 tap to time"}
+                    </button>
+              )}
+              {currentExercise.cue && (
+                <button type="button" onClick={() => setShowCue(v => !v)}
+                  className="text-[11px] px-2 py-0.5 rounded-full flex items-center gap-1"
+                  style={{ background: showCue ? "rgba(14,165,233,0.15)" : "rgba(255,255,255,0.06)", color: showCue ? "var(--brand-primary)" : "rgba(255,255,255,0.55)", border: "none" }}>
+                  <i className="ti ti-info-circle text-xs" /> Cue
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="min-h-0 overflow-y-auto" style={{ WebkitOverflowScrolling: "touch", flexGrow: 0, flexShrink: 1, flexBasis: "auto" }}>
-
-        {/* Exercise header (V6 micro-pill) — one compact row: small video thumb + name +
-            inline History/Swap. Meta as micro-pills, cue collapsed behind an info toggle to
-            keep the header short so all sets sit above the keyboard. NO keyboard-conditioned
-            layout — nothing here moves when the keyboard opens. */}
-        <div className="px-5 mb-3 flex-shrink-0">
-          <div className="flex gap-1.5 mt-2 flex-wrap items-center">
-            {currentExercise.volume_value && (
-              <span className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: "rgba(14,165,233,0.15)", color: "var(--brand-primary)" }}>{currentExercise.volume_value}</span>
-            )}
-            {currentExercise.tempo && (
-              <span className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)" }}>{currentExercise.tempo}</span>
-            )}
-            {currentExercise.load_descriptor && (
-              <span className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)" }}>{currentExercise.load_descriptor}</span>
-            )}
-            {xFields.includes("each_side") && (
-              <span className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: "rgba(14,165,233,0.15)", color: "var(--brand-primary)" }}>Each side</span>
-            )}
-            {/* Rest reaches session mode too, and only on a tap. Without this
-                the whole view had no timer at all once the automatic one went. */}
-            {restLabel(currentExercise.rest) && (
-              isImmediate(currentExercise.rest)
-                ? <span className="text-[11px] px-2 py-0.5 rounded-full" style={{ background: "rgba(14,165,233,0.15)", color: "var(--brand-primary)" }}>{restLabel(currentExercise.rest)}</span>
-                : <button type="button" onClick={e => { e.stopPropagation(); startRest(currentExercise); }}
-                    className="text-[11px] px-2 py-0.5 rounded-full"
-                    style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)" }}>
-                    {restLabel(currentExercise.rest)}{" \u00b7 tap to time"}
-                  </button>
-            )}
-            {currentExercise.cue && (
-              <button type="button" onClick={() => setShowCue(v => !v)}
-                className="text-[11px] px-2 py-0.5 rounded-full flex items-center gap-1"
-                style={{ background: showCue ? "rgba(14,165,233,0.15)" : "rgba(255,255,255,0.06)", color: showCue ? "var(--brand-primary)" : "rgba(255,255,255,0.55)", border: "none" }}>
-                <i className="ti ti-info-circle text-xs" /> Cue
-              </button>
-            )}
-          </div>
           {showCue && currentExercise.cue && (
-            <p className="text-xs mt-2 italic" style={{ color: "rgba(255,255,255,0.45)" }}>&ldquo;{currentExercise.cue}&rdquo;</p>
+            <p className="text-xs px-5 mb-3 italic" style={{ color: "rgba(255,255,255,0.45)" }}>&ldquo;{currentExercise.cue}&rdquo;</p>
           )}
         </div>
-        </div>
-        {/* /scroll region — the exercise HEADER only. It is the one part of this
-            screen whose height is unbounded (a long wrapped movement name), so
-            it is the one part allowed to scroll. */}
+        {/* /scroll region — the expanded CUE only, now that the name, the
+            prescription pills and the sets are all pinned. It is the one thing
+            left here whose height is unbounded, so it is the one thing allowed
+            to scroll, and the only thing that can be squeezed to nothing when
+            the screen runs out of room. Everything a client needs in order to
+            do the set is outside this box. */}
 
         {/* Sets — a PINNED sibling of the scroll region, not a child of it.
             Inside it they inherited the box's squeeze when the keyboard opened.
