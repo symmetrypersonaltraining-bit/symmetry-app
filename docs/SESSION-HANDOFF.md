@@ -667,6 +667,62 @@ that keeps biting: his other session pushes to this repo while you work, so find
 out where `main` actually is before you write a line. On the evening of 9 Sep it
 landed `547a544` mid-session, while this one was reading.
 
+### 📐 SHIPPED 15 Sep — the prescription was cut in half in the logger (#103)
+
+Dustin, with a screenshot of Stacie's session — Battle Rope Alternating Waves,
+11/11, four timed sets: *"Page is cut off on this one."* The pill row under the
+movement name was sliced horizontally — the top half of `30s on / 30s off` and
+the top half of `straight into the next movement`, looking like the **Track:**
+row was on top of them.
+
+**Nothing was overlapping.** Session mode is a fixed box with four children and
+exactly ONE may shrink — the meta-pill box (`min-h-0` + `flex-shrink: 1`). That
+combination lets a box collapse to **zero**. A three-line movement name, the
+Timer/Stopwatch switch and four timed sets left it about ten pixels, so ten
+pixels of a pill is what he photographed.
+
+**This was the Gerard 8/4 fault one element further down** — that time the NAME
+"scrolled into a region with no height, so there was nothing to scroll", and the
+fix pinned the name and left *"only the meta pills and cue"* scrollable. That
+line is what put the pills there.
+
+The rule that finishes it, and the one to apply next time this shape appears:
+**anything a client needs in order to do the set is PINNED.** On a timed movement
+`30s on / 30s off` is the exercise, not decoration. Only the expanded cue is
+still scrollable — opt-in, genuinely unbounded, and a sentence *about* the
+movement. An exercise with no volume/tempo/load/rest/cue now draws no pill row at
+all, because a pinned empty one costs the sets 20px.
+
+Test: `tests/unit/thePrescriptionIsNotCutInHalf.test.ts` pins the ordering
+against the one shrinkable box (3 of 7 assertions fail on the old layout). It
+also asserts session-mode layout still reads nothing about the keyboard.
+
+**Permission note:** the loggers are off limits without per-item permission. He
+gave it by reporting this element. Nothing outside the session-mode header was
+touched.
+
+### ⏳ SHIPPED 15 Sep — the plan-builder test window expired, and the reminder worked (#102)
+
+`PLAN_BUILD_TEST_WINDOW` (ten plan builds a day, 11–14 Sep) came down **by
+calendar**. The reminder to delete the leftover code was the last test in
+`planBuildLimitIsThree.test.ts`, which went red on `main` this morning exactly as
+designed — and it caught this session mid-gate. Window deleted, `defaultLimitFor`
+reduced to a lookup (it keeps its `today` param so no cap ever reads its own
+clock), test file trimmed to the permanent rule rather than deleted, Test Client
+back to `NULL` (backed up in `bak_plan_build_limits_20260915`, 35 rows).
+
+**There is no Routine for this.** The old comment said one would wake a session
+that morning; `list_triggers` shows four Routines and none of them is it, so it
+was either never created or it is a Cowork desktop task — which nothing in a
+session can see. The RED TEST is what actually worked. Use that pattern.
+
+**🔴 STILL OPEN, his call:** every one of the **34 real clients carries
+`ai_daily_plan_build_limit = 1`**, set back when 1 *was* the rule. The per-client
+column beats the default, so his 11 Sep ruling of **three a day never reached
+anyone** — and neither did the ten-a-day test window, which is why nothing looked
+different while he tested. NULLing those 34 columns is what makes 3 real. Not
+done: changing 34 clients' AI caps is his decision, not a session's.
+
 ### 💸 SHIPPED 14 Sep — "9 ready to send" was nine invoices already paid (#101)
 
 Dustin, on the trainer home: *"Wording is not right, 9 are not 'ready to send'
