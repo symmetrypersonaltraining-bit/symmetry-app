@@ -4805,3 +4805,72 @@ provisional ones. The sorting lives in `src/lib/payments/adminMoney.ts` rather
 than inside the component so it can be run against them at all, which is the
 only way the nine was ever going to be caught. The old filter, given the same
 nine rows, returns 9.
+
+---
+
+## Interlude — the prescription was cut in half  ·  15 Sep 2026
+
+Dustin, with a screenshot of Stacie's session — Battle Rope Alternating Waves,
+movement 11 of 11, four timed sets on screen:
+
+> *"Page is cut off on this one."*
+
+The pill row under the movement name was **sliced horizontally**. You could read
+the top half of `30s on / 30s off` and the top half of `straight into the next
+movement`, both apparently sitting behind the **Track:** row.
+
+### Nothing was overlapping
+
+Session mode is a fixed-height box with four children, and exactly one of them
+is allowed to shrink:
+
+| child | behaviour |
+|---|---|
+| section label + movement name + History/Swap/Coach | **pinned** |
+| meta pills (volume, tempo, load, rest, Each side, Cue) | the scroll box — `min-h-0` + `flex-shrink: 1` |
+| Track chips + set rows | **pinned** |
+| notes + Prev/Complete footer | **pinned** |
+
+`min-h-0` with `flex-shrink: 1` lets a box collapse to **zero**. On this
+exercise the name wrapped to three lines, the Timer/Stopwatch switch took a row,
+and four timed sets took four more — so the pinned children claimed nearly the
+whole screen and left the pills about ten pixels. Ten pixels of a pill is what
+he photographed. Scrollable in theory; a graphical fault in practice.
+
+### This exact fault has happened before, one element higher
+
+Gerard, 4 Aug: a mid-session screenshot with **no exercise name anywhere**. The
+name lived in this same box, the box collapsed, and the name *"scrolled into a
+region with no height, so there was nothing to scroll."* The fix then was to pin
+the name and leave "only the meta pills and cue" scrollable — which is the line
+that put the pills where they were found this morning.
+
+### The rule that finishes it
+
+**Anything a client needs in order to do the set is pinned.** On a timed
+movement `30s on / 30s off` is not decoration, it *is* the exercise, and
+`straight into the next movement` is the difference between a superset and
+standing around. So the pill row joins the name and the sets.
+
+Only the **expanded cue** is still scrollable. It is opt-in, it is genuinely
+unbounded, and it is a sentence *about* the movement rather than the movement
+itself — so it is the one thing left that may be squeezed away.
+
+### What a user sees now
+
+- The prescription pills sit directly under the movement name and are always
+  whole, at any name length, on any phone.
+- An exercise carrying no volume, tempo, load, rest or cue draws **no pill row
+  at all** — the row is pinned now, so an empty one would steal 20px from the
+  sets on most bodyweight work.
+- Tapping **Cue** still opens the coaching sentence underneath; that part scrolls.
+- Nothing about the keyboard changed. Session-mode layout is still forbidden
+  from reacting to it, and the test asserts that too.
+
+### Proven, not assumed
+
+`tests/unit/thePrescriptionIsNotCutInHalf.test.ts` pins the ordering: the name,
+the prescription pills and the rest label must all appear **before** the one
+shrinkable box, the cue must appear **inside** it, and the sets must remain a
+sibling **below** it. Run against the old layout, three of its seven assertions
+fail.
